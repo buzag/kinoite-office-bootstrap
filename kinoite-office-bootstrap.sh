@@ -15,8 +15,9 @@ readonly DROPBOX_RPM_URL="https://linux.dropboxstatic.com/packages/fedora/dropbo
 
 # Set both variables in your GitHub copy before publishing it. Obtain them from
 # the Brother ADS-4100 Linux (rpm) download page. Do not use an unverified URL.
-BROTHER_RPM_URL=""
-BROTHER_RPM_SHA256=""
+BROTHER_RPM_URL="https://download.brother.com/welcome/dlf104036/brscan5-1.8.1-0.x86_64.rpm"
+BROTHER_RPM_SHA256="a085e529e2193f050f489639c70e19f52afdec7252b2ac5240eaaddec4febdf7"
+
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 note() { printf '\n==> %s\n' "$*"; }
