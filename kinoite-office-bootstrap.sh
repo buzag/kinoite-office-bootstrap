@@ -94,6 +94,8 @@ PY
     || die "Checksum does not match for the $repository Flatpak."
 }
 
+download "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm" "$workdir/chatgpt.x86_64.rpm"
+
 note "Downloading vendor packages"
 download "$CHROME_RPM_URL" "$workdir/google-chrome.rpm"
 download "$DROPBOX_RPM_URL" "$workdir/dropbox.rpm"
@@ -104,6 +106,8 @@ printf '%s  %s\n' "$BROTHER_RPM_SHA256" "$workdir/brother-ads-4100.rpm" | sha256
 note "Downloading WordCraft and GridCraft Flatpaks"
 github_flatpak "storytold/wordcraft" "$workdir/wordcraft.flatpak"
 github_flatpak "storytold/gridcraft" "$workdir/gridcraft.flatpak"
+
+github_flatpak "storytold/craft-launcher" "$workdir/artcraft-launcher.flatpak"
 
 note "Adding the official NetBird package source"
 sudo install -d -m 0755 /etc/yum.repos.d
@@ -118,6 +122,7 @@ printf '%s\n' \
 
 note "Staging the immutable system deployment"
 sudo rpm-ostree install \
+  "$workdir/chatgpt.x86_64.rpm" \
   netbird \
   sane-backends \
   sane-backends-drivers-scanners \
@@ -130,7 +135,13 @@ note "Installing the office applications for $USER"
 flatpak install --user --noninteractive --bundle "$workdir/wordcraft.flatpak"
 flatpak install --user --noninteractive --bundle "$workdir/gridcraft.flatpak"
 
+flatpak install --user --noninteractive --bundle "$workdir/artcraft-launcher.flatpak"
+
 cat <<'EOF'
+
+Open ArtCraft Launcher to update WordCraft and GridCraft.
+After reboot, open ChatGPT and sign in to use Codex.
+ChatGPT Linux preview on Kinoite 45 needs compatibility testing.
 
 Finished. Reboot now to enter the new Kinoite deployment:
 
