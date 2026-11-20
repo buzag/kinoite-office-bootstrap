@@ -200,8 +200,15 @@ DESKTOP
        sudo -n install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" &&
        sudo -n install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"; then
         echo 'Installed the default wallpaper for new accounts.'
+        if rpm -q plasma-login-manager >/dev/null 2>&1; then
+            sudo -n kwriteconfig6 --file /etc/plasmalogin.conf --group Greeter --key WallpaperPlugin org.kde.image || exit 1
+            sudo -n kwriteconfig6 --file /etc/plasmalogin.conf --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$shared_dir/identigo-szekhely-wallpaper.png" || exit 1
+            sudo -n chmod 0644 /etc/plasmalogin.conf || exit 1
+            echo 'Installed the Plasma login-screen wallpaper for the next boot.'
+        fi
     else
         echo 'System-wide wallpaper setup unavailable. Applying it for this user.'
+        echo 'Changing the boot login screen also requires system-wide sudo access.'
         install -m 0644 "$workdir/wallpaper.png" "$user_dir/identigo-szekhely-wallpaper.png" || exit 1
     fi
 
