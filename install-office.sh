@@ -6,23 +6,18 @@ if [[ $(uname -m) != x86_64 || ! -e /run/ostree-booted || $EUID == 0 ]]; then
     exit 1
 fi
 
-workdir=$(mktemp -d)
-trap 'rm -rf -- "$workdir"' EXIT
-
-download() {
-    curl --proto '=https' --proto-redir '=https' --fail --silent --show-error \
-        --location --retry 3 --output "$2" "$1"
-}
-
 install_craft_app() {
-    local app=$1 version=$2 checksum=$3
-    local bundle="$workdir/$app.flatpak"
-    if flatpak info --user "ai.storyteller.$app" >/dev/null 2>&1; then
+    local ref="app/ai.storyteller.$1/x86_64/stable"
+    local origin
+    if origin=$(flatpak info --user --show-origin "$ref" 2>/dev/null); then
+        if [[ $origin == artcraft-oci ]]; then
+            return
+        fi
+        printf 'Switching %s from %s to ArtCraft.\n' "$1" "$origin"
+        flatpak install --user --noninteractive --assumeyes --reinstall artcraft-oci "$ref"
         return
     fi
-    download "https://github.com/storytold/$app/releases/download/v$version/$app-$version-linux-x86_64.flatpak" "$bundle" || return
-    printf '%s  %s\n' "$checksum" "$bundle" | sha256sum --check || return
-    flatpak install --user --noninteractive --bundle "$bundle"
+    flatpak install --user --noninteractive --assumeyes artcraft-oci "$ref"
 }
 
 install_netbird() {
@@ -64,8 +59,9 @@ else
 fi
 install_step Dropbox flatpak install --user --noninteractive flathub com.dropbox.Client
 install_step Discord flatpak install --user --noninteractive flathub com.discordapp.Discord
-install_step WordCraft install_craft_app wordcraft 0.18.1 7f3923f3537c020521318307428211d80848cd9ccb055265b23d6139216616a9
-install_step GridCraft install_craft_app gridcraft 0.19.1 535289047c3891e5a238feaa186096ca3c0c283cdfde1e0fff72240f5f475d02
+install_step 'ArtCraft repository' flatpak remote-add --user --if-not-exists artcraft-oci https://getartcraft.com/artcraft-oci.flatpakrepo
+install_step WordCraft install_craft_app wordcraft
+install_step GridCraft install_craft_app gridcraft
 
 if (( ${#failed[@]} )); then
     printf '\nFailed steps:\n' >&2

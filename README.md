@@ -12,7 +12,9 @@ Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, and Discord.
 
 After reboot, run `sudo systemctl enable --now netbird`, then `netbird up` to sign in. For a self-hosted setup, use `netbird up --management-url https://YOUR-NETBIRD-SERVER`. Open Dropbox and Discord from the application menu to sign in.
 
-NetBird installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft use checksum-pinned upstream Flatpak bundles.
+NetBird installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft are installed per user from the [official ArtCraft Flatpak repository](https://getartcraft.com/linux).
+
+Discover can update all five Flatpak apps in the background when **Unattended Updates** is enabled in KDE's Software Update settings. If you ran an earlier version of this installer, close WordCraft and GridCraft and rerun the office command to switch their existing per-user Flatpak installations to ArtCraft. Flatpak preserves their app data.
 
 If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. NetBird is installed as a system service with a command-line client. After reboot, use `netbird version` to check that it is available.
 
