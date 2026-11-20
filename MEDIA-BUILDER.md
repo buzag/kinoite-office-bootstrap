@@ -29,7 +29,20 @@ The final Ventoy USB must contain `/ISO/<exact-iso-filename>`, `/ventoy/ventoy.j
 
 ## 2. Copy-paste prompt for Codex or Claude
 
-> You are on my Linux computer. Prepare ONE Fedora Kinoite Ventoy installer USB. The folder `./kinoite-ventoy-config` contains a pre-generated `ventoy/ventoy.json` and `ventoy/script/kinoite.ks`. Find the official Fedora Kinoite ISO with the exact filename referenced by `ventoy.json`, download it from Fedora if needed, and validate its hash against Fedora's official CHECKSUM file (verify the checksum file's GPG signature if possible). Install the current official Ventoy release in UEFI-compatible mode onto the USB drive I explicitly select; **first list all block disks with model/size/transport and ask me to choose and confirm the USB device because this erases the entire USB**. Never infer a target disk, never erase an internal disk, and never modify another USB. After installing Ventoy, label the *large data partition* `KINOITE` (preserving its filesystem), leave the Ventoy EFI partition untouched, copy the ISO to `/ISO/` and the generated `ventoy/` folder to `/ventoy/`, safely eject it, and report the paths and verification results. Validate the Ventoy JSON mapping, confirm file sizes and hashes after copying, and do not claim Kinoite unattended installation works without testing it in a disposable UEFI virtual machine. If a generated config or ISO is missing, ask rather than guessing.
+Copy the entire block into Codex or Claude on the Linux machine connected to the USB drive.
+
+```text
+Prepare one Fedora Kinoite Ventoy installer USB on this Linux computer.
+
+1. The source repo is https://github.com/buzag/kinoite-office-bootstrap.git. Use its existing checkout if available, or clone it into a new local directory. Find create-kinoite-media.sh in the repo root.
+2. Check for ventoy/ventoy.json and ventoy/script/kinoite.ks under kinoite-ventoy-config in the repo checkout and in my working directory. If I provided a different config directory, use that. If the configuration is missing, have me run this in my own terminal using the actual repo path:
+   bash /absolute/path/to/kinoite-office-bootstrap/create-kinoite-media.sh --output /absolute/path/to/kinoite-ventoy-config
+   Give me the real paths and wait until I finish. I enter the Wi-Fi and buzag passwords directly into the generator. Do not ask me to paste passwords or the generated Kickstart into chat.
+3. Read the ISO filename from ventoy.json. Find or download that exact ISO from Fedora and verify its SHA-256 against the official CHECKSUM file. Verify that file's GPG signature if possible. If the exact ISO is unavailable, stop and tell me which filename is needed.
+4. List the block devices with path, model, size, and transport. Ask me to choose the USB disk and explicitly confirm its erasure before installing the official Ventoy release. Never infer the target disk or erase an internal disk.
+5. Label the large Ventoy data partition KINOITE and leave the small EFI partition alone. Copy the verified ISO to /ISO/ and the generated ventoy directory to the root of the data partition. Verify the copied ISO, ventoy.json mapping, and Kickstart file, then safely unmount the USB.
+6. Report what you verified. Treat Kickstart boot compatibility as untested unless the Kickstart actually ran in a disposable UEFI VM.
+```
 
 ## 3. Intended target installation flow
 
