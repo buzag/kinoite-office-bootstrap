@@ -68,6 +68,43 @@ install_anyk() (
     echo "Launch ÁNYK with: cd \"$destination\" && ./abevjava_start"
 )
 
+install_default_wallpaper() (
+    local workdir shared_dir=/var/local/kinoite-office-bootstrap
+    local autostart=/etc/skel/.config/autostart
+    workdir=$(mktemp -d) || exit 1
+    trap 'rm -rf -- "$workdir"' EXIT
+
+    download 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/identigo-szekhely-wallpaper.png' "$workdir/wallpaper.png" || exit 1
+    printf '%s  %s\n' 7ea277cda1c93a1fd5ecc4b2a859d18adeac95784025c112b884d62dd73bd722 "$workdir/wallpaper.png" | sha256sum --check || exit 1
+
+    cat > "$workdir/apply-wallpaper" <<'SCRIPT' || exit 1
+#!/usr/bin/env bash
+for ((attempt = 0; attempt < 30; attempt++)); do
+    if plasma-apply-wallpaperimage /var/local/kinoite-office-bootstrap/identigo-szekhely-wallpaper.png; then
+        rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/kinoite-office-wallpaper.desktop"
+        exit
+    fi
+    sleep 2
+done
+exit 1
+SCRIPT
+
+    cat > "$workdir/kinoite-office-wallpaper.desktop" <<'DESKTOP' || exit 1
+[Desktop Entry]
+Type=Application
+Name=Set office wallpaper
+OnlyShowIn=KDE;
+TryExec=plasma-apply-wallpaperimage
+Exec=/usr/bin/bash /var/local/kinoite-office-bootstrap/apply-wallpaper
+DESKTOP
+
+    sudo install -d -m 0755 "$shared_dir" || exit 1
+    sudo mkdir -p "$autostart" || exit 1
+    sudo install -m 0644 "$workdir/wallpaper.png" "$shared_dir/identigo-szekhely-wallpaper.png" || exit 1
+    sudo install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" || exit 1
+    sudo install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"
+)
+
 install_craft_app() {
     local ref="app/ai.storyteller.$1/x86_64/stable"
     local origin
@@ -254,6 +291,7 @@ install_step WordCraft install_craft_app wordcraft
 install_step GridCraft install_craft_app gridcraft
 
 install_step ÁNYK install_anyk
+install_step 'Default wallpaper for new users' install_default_wallpaper
 
 if (( ${#failed[@]} )); then
     printf '\nFailed steps:\n' >&2

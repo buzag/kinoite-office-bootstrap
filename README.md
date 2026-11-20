@@ -6,6 +6,8 @@ On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as 
 
 Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, ChatGPT desktop with Codex, and ÁNYK (AbevJava).
 
+Accounts created after running the office installer get the identiGO / SzékhelySzolgálat wallpaper on their first Plasma login. Users can change it afterwards.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh | bash
 ```
