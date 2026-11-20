@@ -212,8 +212,10 @@ DESKTOP
         install -m 0644 "$workdir/wallpaper.png" "$user_dir/identigo-szekhely-wallpaper.png" || exit 1
     fi
 
-    cat > "$user_dir/apply-desktop" <<'SCRIPT' || exit 1
-#!/usr/bin/env bash
+    {
+        printf '#!/usr/bin/env bash\n'
+        declare -f chrome_desktop_id
+        cat <<'SCRIPT'
 set -euo pipefail
 user_dir="$HOME/.local/share/kinoite-office-bootstrap"
 wallpaper="$user_dir/identigo-szekhely-wallpaper.png"
@@ -224,9 +226,14 @@ remove_default_browser=false
 case "$browser" in
     ''|firefox.desktop|org.mozilla.firefox.desktop) remove_default_browser=true ;;
 esac
+chrome_id=$(chrome_desktop_id) || chrome_id=''
+if [[ -n $chrome_id ]]; then
+    remove_default_browser=true
+fi
 
 panel_script=$(cat <<JS
 const removeDefaultBrowser = $remove_default_browser;
+const chromeId = "$chrome_id";
 const defaults = "applications:systemsettings.desktop,applications:org.kde.discover.desktop,preferred://filemanager,preferred://browser";
 for (const panel of panels()) {
     for (const widget of panel.widgets()) {
@@ -240,7 +247,10 @@ for (const panel of panels()) {
             if (removeDefaultBrowser && launcher === "preferred://browser") return false;
             return !/^(firefox|org\.mozilla\.firefox|org\.kde\.discover|systemsettings|org\.kde\.systemsettings)\.desktop$/.test(id);
         });
-        if (remaining.length !== launchers.length) {
+        if (chromeId && !remaining.some((launcher) => launcher.split("?")[0] === "applications:" + chromeId)) {
+            remaining.push("applications:" + chromeId);
+        }
+        if (remaining.join(",") !== launchers.join(",")) {
             widget.writeConfig("launchers", remaining.join(","));
         }
     }
@@ -261,6 +271,7 @@ for ((attempt = 0; attempt < 30; attempt++)); do
 done
 exit 1
 SCRIPT
+    } > "$user_dir/apply-desktop" || exit 1
 
     cat > "$user_autostart/kinoite-office-desktop.desktop" <<'DESKTOP' || exit 1
 [Desktop Entry]
@@ -415,24 +426,51 @@ REPO
     fi
 }
 
-configure_browser() {
-    local chrome_id mime package state deployment
-    local -a layered=() base=()
+chrome_desktop_id() {
     if rpm -q google-chrome-stable >/dev/null 2>&1; then
-        chrome_id=google-chrome.desktop
+        echo google-chrome.desktop
     elif flatpak info com.google.Chrome >/dev/null 2>&1; then
-        chrome_id=com.google.Chrome.desktop
+        echo com.google.Chrome.desktop
     else
+        return 1
+    fi
+}
+
+set_default_app() {
+    local desktop_id=$1 mime
+    shift
+    # Write the desktop defaults directly so this also works before first login.
+    mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}" || return
+    for mime in "$@"; do
+        kwriteconfig6 --file mimeapps.list --group 'Default Applications' --key "$mime" "$desktop_id;" || return
+        kwriteconfig6 --file kde-mimeapps.list --group 'Default Applications' --key "$mime" "$desktop_id;" || return
+    done
+}
+
+configure_craft_app() {
+    local app=$1
+    shift
+    install_craft_app "$app" || return
+    if [[ $app == gridcraft ]]; then
+        # GridCraft opens .xls but its desktop entry does not advertise the MIME type.
+        local associations
+        associations=$(kreadconfig6 --file mimeapps.list --group 'Added Associations' --key application/vnd.ms-excel) || return
+        if [[ ";$associations;" != *';ai.storyteller.gridcraft.desktop;'* ]]; then
+            kwriteconfig6 --file mimeapps.list --group 'Added Associations' --key application/vnd.ms-excel \
+                "ai.storyteller.gridcraft.desktop;$associations" || return
+        fi
+    fi
+    set_default_app "ai.storyteller.$app.desktop" "$@"
+}
+
+configure_browser() {
+    local chrome_id package state deployment
+    local -a layered=() base=()
+    if ! chrome_id=$(chrome_desktop_id); then
         echo 'Chrome is unavailable. Firefox was retained.' >&2
         return 1
     fi
-
-    # Write the desktop defaults directly so this also works before first login.
-    mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}" || return
-    for mime in x-scheme-handler/http x-scheme-handler/https text/html; do
-        kwriteconfig6 --file mimeapps.list --group 'Default Applications' --key "$mime" "$chrome_id;" || return
-        kwriteconfig6 --file kde-mimeapps.list --group 'Default Applications' --key "$mime" "$chrome_id;" || return
-    done
+    set_default_app "$chrome_id" x-scheme-handler/http x-scheme-handler/https text/html || return
     kwriteconfig6 --file kdeglobals --group General --key BrowserApplication "$chrome_id" || return
 
     if flatpak info --user org.mozilla.firefox >/dev/null 2>&1; then
@@ -490,7 +528,7 @@ install_step() {
 install_step NetBird install_netbird
 
 install_step Flathub flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-if rpm -q google-chrome-stable >/dev/null 2>&1 || flatpak info com.google.Chrome >/dev/null 2>&1; then
+if chrome_desktop_id >/dev/null; then
     echo 'OK: Google Chrome is already installed.'
 else
     install_step 'Google Chrome' flatpak install --user --noninteractive --assumeyes flathub com.google.Chrome
@@ -499,8 +537,9 @@ install_step 'Default browser and Firefox removal' configure_browser
 install_step Dropbox flatpak install --user --noninteractive --assumeyes flathub com.dropbox.Client
 install_step Discord flatpak install --user --noninteractive --assumeyes flathub com.discordapp.Discord
 install_step 'ArtCraft repository' flatpak remote-add --user --if-not-exists artcraft-oci https://getartcraft.com/artcraft-oci.flatpakrepo
-install_step WordCraft install_craft_app wordcraft
-install_step GridCraft install_craft_app gridcraft
+install_step WordCraft configure_craft_app wordcraft application/msword application/vnd.openxmlformats-officedocument.wordprocessingml.document
+install_step GridCraft configure_craft_app gridcraft application/vnd.ms-excel application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+install_step PdfCraft configure_craft_app pdfcraft application/pdf
 
 install_step ÁNYK install_anyk
 install_step 'Wallpaper and panel shortcuts' install_desktop_defaults

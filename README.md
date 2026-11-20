@@ -4,9 +4,9 @@ On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as 
 
 ## Office apps and ÁNYK
 
-Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, and ÁNYK (AbevJava).
+Installs NetBird, WordCraft, GridCraft, PdfCraft, Google Chrome, Dropbox, Discord, and ÁNYK (AbevJava).
 
-The installer sets Chrome as the default browser for the current user and removes Firefox once Chrome is available. Firefox RPM removal takes effect after reboot.
+The installer sets Chrome as the default browser for the current user and removes Firefox once Chrome is available. Chrome is pinned to the KDE panel at the next Plasma login. GridCraft opens .xlsx and .xls, WordCraft opens .docx and .doc, and PdfCraft opens .pdf by default. Firefox RPM removal takes effect after reboot.
 
 With non-interactive sudo access, new accounts get the identiGO / SzékhelySzolgálat image as both the desktop and lock-screen wallpaper on their first Plasma login. The system login screen also uses the same image at the next boot on systems using Plasma Login Manager, the default on fresh Kinoite 44 and later. If that setup is unavailable, the installer queues both wallpaper changes for the current user instead. The current user’s Firefox, Discover, and System Settings panel shortcuts are removed at the next Plasma login. Other shortcuts stay in place.
 
@@ -16,9 +16,9 @@ curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs
 
 At the start, enter your NetBird server hostname or HTTPS URL. Press Enter for NetBird Cloud. The installer adds HTTPS to a bare hostname and skips sign-in for an already configured client. After reboot and desktop login, NetBird starts automatically. Complete the sign-in in the browser when it opens. Open Dropbox and Discord from the application menu to sign in.
 
-The NetBird desktop app installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft are installed per user from the [official ArtCraft Flatpak repository](https://getartcraft.com/linux).
+The NetBird desktop app installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft, GridCraft, and PdfCraft are installed per user from the [official ArtCraft Flatpak repository](https://getartcraft.com/linux).
 
-Discover can update all five Flatpak apps in the background when **Unattended Updates** is enabled in KDE's Software Update settings. If you ran an earlier version of this installer, close WordCraft and GridCraft and rerun the office command to switch their existing per-user Flatpak installations to ArtCraft. Flatpak preserves their app data.
+Discover can update all six Flatpak apps in the background when **Unattended Updates** is enabled in KDE's Software Update settings. If you ran an earlier version of this installer, close WordCraft and GridCraft and rerun the office command to switch their existing per-user Flatpak installations to ArtCraft. Flatpak preserves their app data.
 
 If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. After reboot, open **NetBird** from the application menu. Use `systemctl is-active netbird.service` to check the daemon and `netbird status` to check the connection. A running daemon reports `active`. A working connection shows **Management: Connected** and **Signal: Connected**.
 
