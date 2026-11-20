@@ -14,11 +14,11 @@ curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs
 
 At the start, enter your NetBird server hostname or HTTPS URL. Press Enter for NetBird Cloud. The installer adds HTTPS to a bare hostname and skips sign-in for an already configured client. After reboot and desktop login, NetBird starts automatically. Complete the sign-in in the browser when it opens. Open Dropbox and Discord from the application menu to sign in.
 
-NetBird installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft are installed per user from the [official ArtCraft Flatpak repository](https://getartcraft.com/linux).
+The NetBird desktop app installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft are installed per user from the [official ArtCraft Flatpak repository](https://getartcraft.com/linux).
 
 Discover can update all five Flatpak apps in the background when **Unattended Updates** is enabled in KDE's Software Update settings. If you ran an earlier version of this installer, close WordCraft and GridCraft and rerun the office command to switch their existing per-user Flatpak installations to ArtCraft. Flatpak preserves their app data.
 
-If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. NetBird is installed as a system service with a command-line client. After reboot, use `netbird version` to check that it is available.
+If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. After reboot, open **NetBird** from the application menu. Use `systemctl is-active netbird.service` to check the daemon and `netbird status` to check the connection. A running daemon reports `active`. A working connection shows **Management: Connected** and **Signal: Connected**.
 
 ÁNYK installs silently into `$HOME/abevjava` with a per-user Temurin Java 8 runtime. The installer adds a searchable **ÁNYK (AbevJava)** shortcut to the current user’s application menu, including when the app is already installed. If setup fails, check `$HOME/abevjava_silent_install.log`. See [NAV’s installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2FTelepitesi_leiras_2017.12.13._).
 
@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs
 
 Replace `netbird.example.com` with your management server hostname or HTTPS URL. Run as the desktop user with non-interactive sudo authorization already configured by your provisioning system. Sudo authorization failures are reported without a password prompt.
 
-NetBird starts using the supplied server as soon as the installed package is available, which may require the next reboot. The installer does not open a browser or wait for NetBird login. When ready to connect, the user can run `netbird up --management-url https://netbird.example.com` and complete browser sign-in. An existing profile for a different server is preserved and reported as a failed NetBird step.
+NetBird starts using the supplied server as soon as the installed package is available, which may require the next reboot. The installer does not open a browser or wait for NetBird login. When ready to connect, open **NetBird** from the application menu or run `netbird up --management-url https://netbird.example.com` and complete browser sign-in. An existing profile for a different server is preserved and reported as a failed NetBird step.
 
 You can rerun the same command between reboots. A rerun reuses the NetBird profile for the same server. The script attempts the remaining installers after a failed step and exits with a nonzero status if any step fails. Your provisioning system controls when to reboot.
 

@@ -367,7 +367,7 @@ repo_gpgcheck=1
 gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
 REPO
     fi
-    "${as_root[@]}" rpm-ostree install --idempotent --allow-inactive netbird || return
+    "${as_root[@]}" rpm-ostree install --idempotent --allow-inactive netbird-ui gtk4 webkitgtk6.0 xdg-utils || return
     if $unattended; then
         seed_netbird_profile "$url" || return
         # Remove a pending browser login scheduled by an earlier interactive run.
