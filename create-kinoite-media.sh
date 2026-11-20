@@ -1,96 +1,45 @@
 #!/usr/bin/env bash
-# Build Fedora Kinoite installation USB + automatic OEMDRV Kickstart USB.
-# Linux builder only. Test first in a VM. Destructively writes the selected USB devices.
+# Generate a self-contained Fedora Kinoite Kickstart and Ventoy auto-install config.
+# This script never formats USB drives and never downloads an ISO.
 set -euo pipefail
 umask 077
 
-CONFIG_ONLY=false
-case "${1:-}" in
-    --config-only) CONFIG_ONLY=true; shift ;;
-    --help|-h)
-        echo 'Usage: sudo ./create-kinoite-media.sh [--config-only]'
-        echo '  --config-only  Format/write only the OEMDRV configuration USB; keep an existing installer USB unchanged.'
-        exit 0 ;;
-    '') ;;
-    *) echo "Unknown option: $1" >&2; exit 2 ;;
-esac
-(( $# == 0 )) || { echo 'Unexpected extra arguments' >&2; exit 2; }
-
+usage() {
+  cat <<'HELP'
+Usage: ./create-kinoite-media.sh [--output DIR] [--iso-name NAME] [--fedora-version N]
+Generate only configuration files for a Ventoy USB. Does not require root.
+ISO must be placed at /ISO/<NAME> on the Ventoy data partition.
+HELP
+}
+OUTPUT_DIR="${OUTPUT_DIR:-$PWD/kinoite-ventoy-config}"
 FEDORA_VERSION="${FEDORA_VERSION:-44}"
-ISO_NAME="${ISO_NAME:-Fedora-Kinoite-ostree-x86_64-${FEDORA_VERSION}-1.7.iso}"
-ISO_URL="${ISO_URL:-https://download.fedoraproject.org/pub/fedora/linux/releases/${FEDORA_VERSION}/Kinoite/x86_64/iso/${ISO_NAME}}"
-CHECKSUM_URL="${CHECKSUM_URL:-https://download.fedoraproject.org/pub/fedora/linux/releases/${FEDORA_VERSION}/Kinoite/x86_64/iso/Fedora-Kinoite-${FEDORA_VERSION}-1.7-x86_64-CHECKSUM}"
+ISO_NAME="${ISO_NAME:-Fedora-Kinoite-ostree-x86_64-44-1.7.iso}"
 NETBIRD_URL="${NETBIRD_URL:-https://netbird.a.h1v3.com}"
-CACHE_DIR="${CACHE_DIR:-$PWD/fedora-cache}"
-
-fail() { echo "ERROR: $*" >&2; exit 1; }
-[[ $(id -u) -eq 0 ]] || fail 'Run as root (sudo).'
-[[ $(uname -s) == Linux ]] || fail 'Use a Linux builder machine.'
-for cmd in lsblk findmnt udevadm curl sha256sum dd wipefs sgdisk partprobe mkfs.vfat openssl python3 mount umount readlink xargs awk sed; do
-    command -v "$cmd" >/dev/null || fail "Missing command: $cmd"
+while (( $# )); do
+  case "$1" in
+    --output) (( $# >= 2 )) || { usage >&2; exit 2; }; OUTPUT_DIR=$2; shift 2 ;;
+    --iso-name) (( $# >= 2 )) || { usage >&2; exit 2; }; ISO_NAME=$2; shift 2 ;;
+    --fedora-version) (( $# >= 2 )) || { usage >&2; exit 2; }; FEDORA_VERSION=$2; shift 2 ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
 done
-[[ $NETBIRD_URL =~ ^https://[A-Za-z0-9.:-]+/?$ ]] || fail 'NETBIRD_URL must be an https:// hostname URL.'
-if ! $CONFIG_ONLY; then mkdir -p "$CACHE_DIR"; fi
-
-if ! $CONFIG_ONLY; then
-    read -r -p 'Installer USB whole-disk device (example /dev/sdb): ' INSTALL_USB </dev/tty
-    INSTALL_USB=$(readlink -f "$INSTALL_USB")
-fi
-read -r -p 'Kickstart USB whole-disk device (example /dev/sdc): ' CONFIG_USB </dev/tty
-CONFIG_USB=$(readlink -f "$CONFIG_USB")
-if ! $CONFIG_ONLY; then
-    [[ $INSTALL_USB != "$CONFIG_USB" ]] || fail 'Choose two DIFFERENT USB drives.'
-    devices=("$INSTALL_USB" "$CONFIG_USB")
-else
-    devices=("$CONFIG_USB")
-fi
-for dev in "${devices[@]}"; do
-    [[ -b $dev && $(lsblk -dn -o TYPE "$dev") == disk ]] || fail "$dev is not a whole disk"
-    [[ $(lsblk -dn -o TRAN "$dev" | xargs) == usb ]] || fail "$dev is not detected as USB; refusing to wipe"
-    [[ -z $(lsblk -nr -o MOUNTPOINT "$dev" | grep -v '^$' || :) ]] || fail "Unmount all partitions on $dev first"
-done
-lsblk -o NAME,TRAN,SIZE,MODEL,TYPE "${devices[@]}"
-if $CONFIG_ONLY; then
-    echo 'ONLY THE CONFIGURATION USB WILL BE ERASED. The existing Fedora installer USB is not touched.'
-    read -r -p 'Type ERASE-CONFIG to continue: ' confirm </dev/tty
-    [[ $confirm == ERASE-CONFIG ]] || fail 'Cancelled.'
-else
-    echo 'BOTH SELECTED USB DEVICES WILL BE COMPLETELY ERASED.'
-    read -r -p 'Type ERASE-BOTH to continue: ' confirm </dev/tty
-    [[ $confirm == ERASE-BOTH ]] || fail 'Cancelled.'
-fi
-
-# Existing credentials are baked into configuration USB; prompt at BUILD time, not target installation.
-read -r -p 'Wi-Fi SSID: ' WIFI_SSID </dev/tty
-[[ -n $WIFI_SSID && $WIFI_SSID != *$'\n'* ]] || fail 'Invalid SSID'
-read -rs -p 'Wi-Fi password: ' WIFI_PASSWORD </dev/tty; echo
-[[ -n $WIFI_PASSWORD ]] || fail 'Wi-Fi password required'
-read -rs -p 'Preconfigured buzag password: ' BUZAG_PASSWORD </dev/tty; echo
-read -rs -p 'Confirm buzag password: ' BUZAG_CONFIRM </dev/tty; echo
-[[ -n $BUZAG_PASSWORD && $BUZAG_PASSWORD == "$BUZAG_CONFIRM" ]] || fail 'buzag passwords differ or blank'
-BUZAG_HASH=$(openssl passwd -6 -stdin <<<"$BUZAG_PASSWORD")
+[[ $FEDORA_VERSION =~ ^[0-9]{2}$ ]] || { echo 'Invalid Fedora version' >&2; exit 2; }
+[[ $ISO_NAME =~ ^[A-Za-z0-9._+-]+\.iso$ ]] || { echo 'ISO name must be a plain .iso filename' >&2; exit 2; }
+[[ $NETBIRD_URL =~ ^https://[A-Za-z0-9.:-]+/?$ ]] || { echo 'Invalid NETBIRD_URL (HTTPS required)' >&2; exit 2; }
+for cmd in python3 openssl base64; do command -v "$cmd" >/dev/null || { echo "Missing $cmd" >&2; exit 1; }; done
+[[ -t 0 ]] || { echo 'Run interactively in a terminal.' >&2; exit 1; }
+[[ ! -e "$OUTPUT_DIR" || ! -e "$OUTPUT_DIR/ventoy" ]] || { echo "Refusing to overwrite existing ventoy configuration: $OUTPUT_DIR" >&2; exit 1; }
+read -r -p 'Wi-Fi SSID: ' WIFI_SSID
+read -rs -p 'Wi-Fi password: ' WIFI_PASSWORD; echo
+read -rs -p 'Fixed buzag account password: ' BUZAG_PASSWORD; echo
+read -rs -p 'Confirm buzag password: ' BUZAG_CONFIRM; echo
+[[ -n $WIFI_SSID && -n $WIFI_PASSWORD && -n $BUZAG_PASSWORD && $BUZAG_PASSWORD == "$BUZAG_CONFIRM" ]] || { echo 'Missing credentials or mismatched passwords' >&2; exit 1; }
+BUZAG_HASH=$(printf '%s\n' "$BUZAG_PASSWORD" | openssl passwd -6 -stdin)
 unset BUZAG_PASSWORD BUZAG_CONFIRM
-
-if ! $CONFIG_ONLY; then
-iso="$CACHE_DIR/$ISO_NAME"
-checksum="$CACHE_DIR/$(basename "$CHECKSUM_URL")"
-if [[ ! -s $iso ]]; then
-    curl --fail --location --retry 3 -o "$iso.part" "$ISO_URL"
-    mv -f "$iso.part" "$iso"
-fi
-curl --fail --location --retry 3 -o "$checksum" "$CHECKSUM_URL"
-# Fedora's checksum file contains lines in the format: SHA256 (filename) = digest.
-expected=$(sed -nE "s/^SHA256 \(${ISO_NAME//./\.}\) = ([[:xdigit:]]{64})$/\1/p" "$checksum" | head -n1)
-[[ -n $expected ]] || fail 'Could not locate the ISO hash in Fedora checksum file.'
-echo "$expected  $iso" | sha256sum -c - || fail 'ISO SHA256 verification failed'
-echo 'ISO SHA256 verified against downloaded checksum file (GPG signature not verified).'
-
-fi
-
 work=$(mktemp -d)
-trap '[[ -n ${mountdir:-} ]] && umount "$mountdir" 2>/dev/null || :; rm -rf "$work"' EXIT
-mkdir "$work/content"
-
+trap 'rm -rf -- "$work"' EXIT
+mkdir -p "$work/content"
 # Kickstart %pre runs in installer RAM, prompts on virtual console 6, and emits a dynamic fragment.
 cat > "$work/content/ks.cfg" <<'KS'
 # Fedora Kinoite OSTree installer — tested configuration must be validated on your ISO before production use.
@@ -170,22 +119,16 @@ chvt 1 || :
 %post --nochroot --interpreter=/usr/bin/bash --log=/mnt/sysroot/var/log/kinoite-provision-post.log
 set -euo pipefail
 mkdir -p /mnt/sysroot/usr/local/sbin /mnt/sysroot/etc/systemd/system /mnt/sysroot/etc/NetworkManager/system-connections /mnt/sysroot/var/lib/kinoite-provision
-usb=/run/install/oemdrv
-mkdir -p "$usb"
-mounted=0
-if ! mountpoint -q "$usb"; then
-    mount -o ro /dev/disk/by-label/OEMDRV "$usb"
-    mounted=1
-fi
-install -m 0700 "$usb/kinoite-provision.sh" /mnt/sysroot/usr/local/sbin/kinoite-provision
-install -m 0600 "$usb/office-wifi.nmconnection" /mnt/sysroot/etc/NetworkManager/system-connections/office-wifi.nmconnection
-install -m 0644 "$usb/kinoite-provision.service" /mnt/sysroot/etc/systemd/system/kinoite-provision.service
+# All provisioning assets are embedded below (base64) in this Kickstart.
+EMBEDDED_PAYLOADS
+chmod 0700 /mnt/sysroot/usr/local/sbin/kinoite-provision
+chmod 0600 /mnt/sysroot/etc/NetworkManager/system-connections/office-wifi.nmconnection
+chmod 0644 /mnt/sysroot/etc/systemd/system/kinoite-provision.service
 install -m 0600 /tmp/kinoite-secondary-user /mnt/sysroot/var/lib/kinoite-provision/secondary-user
 mkdir -p /mnt/sysroot/etc/systemd/system/multi-user.target.wants
 ln -sf ../kinoite-provision.service /mnt/sysroot/etc/systemd/system/multi-user.target.wants/kinoite-provision.service
 ln -sf /usr/lib/systemd/system/multi-user.target /mnt/sysroot/etc/systemd/system/default.target
 rm -f /mnt/sysroot/root/anaconda-ks.cfg /mnt/sysroot/root/original-ks.cfg
-if (( mounted )); then umount "$usb"; fi
 %end
 KS
 
@@ -309,33 +252,56 @@ import sys
 p=Path(sys.argv[1]); p.write_text(p.read_text().replace('NETBIRD_URL_PLACEHOLDER',sys.argv[2]))
 PY
 
-# FIRST write the official ISO to install USB, then prepare the OEMDRV USB.
-if ! $CONFIG_ONLY; then
-    echo "Writing official ISO to $INSTALL_USB ..."
-    dd if="$iso" of="$INSTALL_USB" bs=8M status=progress conv=fsync
-    sync
-fi
-echo "Formatting OEMDRV configuration drive $CONFIG_USB ..."
-wipefs -a "$CONFIG_USB"
-sgdisk --zap-all "$CONFIG_USB"
-sgdisk -n 1:1MiB:0 -t 1:0700 "$CONFIG_USB"
-partprobe "$CONFIG_USB"
-udevadm settle
-part=$(lsblk -nrpo NAME,TYPE "$CONFIG_USB" | awk '$2=="part"{print $1;exit}')
-[[ -b $part ]] || fail 'Could not discover OEMDRV partition'
-mkfs.vfat -F 32 -n OEMDRV "$part"
-mountdir="$work/mnt"
-mkdir "$mountdir"
-mount "$part" "$mountdir"
-cp -a "$work/content/." "$mountdir/"
-sync
-umount "$mountdir"
-mountdir=''
-if $CONFIG_ONLY; then
-    echo 'Finished. Insert your EXISTING Fedora Kinoite boot USB alongside this OEMDRV USB.'
-else
-    echo "Finished. Insert BOTH USB drives and boot from $INSTALL_USB."
-fi
-echo 'The installer will attempt to discover OEMDRV/ks.cfg automatically (not tested against Kinoite live media).'
-echo 'If your ISO does not detect OEMDRV, this media is NOT zero-parameter boot compatible; do not proceed with a destructive manual install.'
-echo 'Expect disk, LUKS and secondary-user prompts. LUKS must be unlocked at each reboot.'
+
+# Make kickstart self-contained: Ventoy only injects the template itself.
+# Base64 is transport encoding, not encryption; treat the resulting USB as sensitive.
+KINOITE_WORK="$work" python3 - <<'PYEMBED'
+import base64, os
+from pathlib import Path
+w=Path(os.environ['KINOITE_WORK'])
+ks=w/'content/ks.cfg'
+s=ks.read_text()
+blocks=[]
+for name, dest in [
+ ('kinoite-provision.sh','/mnt/sysroot/usr/local/sbin/kinoite-provision'),
+ ('office-wifi.nmconnection','/mnt/sysroot/etc/NetworkManager/system-connections/office-wifi.nmconnection'),
+ ('kinoite-provision.service','/mnt/sysroot/etc/systemd/system/kinoite-provision.service')]:
+   data=base64.b64encode((w/'content'/name).read_bytes()).decode('ascii')
+   blocks.append("base64 -d > '"+dest+"' <<'PAYLOAD'\n"+"\n".join(data[i:i+76] for i in range(0,len(data),76))+"\nPAYLOAD")
+assert s.count('EMBEDDED_PAYLOADS')==1
+ks.write_text(s.replace('EMBEDDED_PAYLOADS','\n'.join(blocks)))
+PYEMBED
+mkdir -p "$work/out/ventoy/script" "$work/out/ISO"
+mv "$work/content/ks.cfg" "$work/out/ventoy/script/kinoite.ks"
+python3 - "$work/out/ventoy/ventoy.json" "$ISO_NAME" <<'PYJSON'
+import json,sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps({"auto_install":[{
+  "image":"/ISO/"+sys.argv[2],
+  "template":"/ventoy/script/kinoite.ks",
+  "autosel":1
+}]},indent=2)+"\n")
+PYJSON
+cat > "$work/out/ISO/PUT-FEDORA-ISO-HERE.txt" <<EOF
+Copy the official Fedora Kinoite ISO here with this EXACT filename:
+$ISO_NAME
+Do not rename it unless you regenerate ventoy.json accordingly.
+EOF
+cat > "$work/out/README.txt" <<EOF
+Configuration only. No USB formatting has occurred.
+1. Use the Codex or Claude prompt in the repository’s MEDIA-BUILDER.md to prepare the USB.
+2. Set the Ventoy data partition filesystem label to KINOITE (NOT the EFI/VTOYEFI partition).
+3. Copy the official verified $ISO_NAME to /ISO/ on the Ventoy data partition.
+4. Copy ventoy/ directory and its contents to the root of the Ventoy data partition.
+5. Validate ventoy/ventoy.json and boot-test in a disposable UEFI VM before use.
+WARNING: Wi-Fi password is embedded in ventoy/script/kinoite.ks; protect the USB.
+WARNING: Kinoite + Ventoy Kickstart compatibility and interactive %pre still require testing.
+EOF
+mkdir -p "$OUTPUT_DIR"
+cp -a "$work/out/." "$OUTPUT_DIR/"
+chmod 0700 "$OUTPUT_DIR" "$OUTPUT_DIR/ventoy" "$OUTPUT_DIR/ventoy/script"
+chmod 0600 "$OUTPUT_DIR/ventoy/script/kinoite.ks" "$OUTPUT_DIR/ventoy/ventoy.json"
+echo "Created Ventoy config ONLY at: $OUTPUT_DIR"
+echo "Expected ISO at /ISO/$ISO_NAME and volume label KINOITE"
+echo 'No USB was modified. LUKS passphrase will be requested at each boot.'
+echo 'EXPERIMENTAL: verify in a disposable VM before disk erasure.'

@@ -44,4 +44,4 @@ Review the [Brother driver license](https://support.brother.com/g/s/agreement/En
 
 ## Installation media builder
 
-The experimental [installation media builder](MEDIA-BUILDER.md) prepares a Fedora Kinoite installer USB and an OEMDRV configuration USB.
+The experimental [Ventoy config generator](MEDIA-BUILDER.md) prepares a Kickstart file and Ventoy configuration for a single Fedora Kinoite USB. The guide includes a copy-paste prompt for Codex or Claude to create the USB.
