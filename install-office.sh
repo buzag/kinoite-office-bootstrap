@@ -403,6 +403,65 @@ REPO
     fi
 }
 
+configure_browser() {
+    local chrome_id mime package state deployment
+    local -a layered=() base=()
+    if rpm -q google-chrome-stable >/dev/null 2>&1; then
+        chrome_id=google-chrome.desktop
+    elif flatpak info com.google.Chrome >/dev/null 2>&1; then
+        chrome_id=com.google.Chrome.desktop
+    else
+        echo 'Chrome is unavailable. Firefox was retained.' >&2
+        return 1
+    fi
+
+    # Write the desktop defaults directly so this also works before first login.
+    mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}" || return
+    for mime in x-scheme-handler/http x-scheme-handler/https text/html; do
+        kwriteconfig6 --file mimeapps.list --group 'Default Applications' --key "$mime" "$chrome_id;" || return
+        kwriteconfig6 --file kde-mimeapps.list --group 'Default Applications' --key "$mime" "$chrome_id;" || return
+    done
+    kwriteconfig6 --file kdeglobals --group General --key BrowserApplication "$chrome_id" || return
+
+    if flatpak info --user org.mozilla.firefox >/dev/null 2>&1; then
+        flatpak uninstall --user --noninteractive --assumeyes org.mozilla.firefox || return
+    fi
+    if flatpak info --system org.mozilla.firefox >/dev/null 2>&1; then
+        "${as_root[@]}" flatpak uninstall --system --noninteractive --assumeyes org.mozilla.firefox || return
+    fi
+
+    if rpm -q firefox >/dev/null 2>&1 || rpm -q firefox-langpacks >/dev/null 2>&1; then
+        deployment=$(rpm-ostree status --json | python3 -c '
+import json, sys
+deployments = json.load(sys.stdin)["deployments"]
+deployment = deployments[0]
+booted = next(item for item in deployments if item.get("booted"))
+layered = set(deployment.get("requested-packages", []))
+removed = set(deployment.get("requested-base-removals", []))
+removed.update(set(booted.get("requested-packages", [])) - layered)
+for package in removed:
+    print("removed", package)
+for package in layered - removed:
+    print("layered", package)
+') || return
+        for package in firefox firefox-langpacks; do
+            rpm -q "$package" >/dev/null 2>&1 || continue
+            state=$(printf '%s\n' "$deployment" | awk -v package="$package" '$2 == package {print $1; exit}')
+            case $state in
+                removed) ;;
+                layered) layered+=("$package") ;;
+                *) base+=("$package") ;;
+            esac
+        done
+        if (( ${#layered[@]} )); then
+            "${as_root[@]}" rpm-ostree uninstall "${layered[@]}" || return
+        fi
+        if (( ${#base[@]} )); then
+            "${as_root[@]}" rpm-ostree override remove "${base[@]}" || return
+        fi
+    fi
+}
+
 failed=()
 install_step() {
     local label=$1
@@ -424,6 +483,7 @@ if rpm -q google-chrome-stable >/dev/null 2>&1 || flatpak info com.google.Chrome
 else
     install_step 'Google Chrome' flatpak install --user --noninteractive --assumeyes flathub com.google.Chrome
 fi
+install_step 'Default browser and Firefox removal' configure_browser
 install_step Dropbox flatpak install --user --noninteractive --assumeyes flathub com.dropbox.Client
 install_step Discord flatpak install --user --noninteractive --assumeyes flathub com.discordapp.Discord
 install_step 'ArtCraft repository' flatpak remote-add --user --if-not-exists artcraft-oci https://getartcraft.com/artcraft-oci.flatpakrepo
