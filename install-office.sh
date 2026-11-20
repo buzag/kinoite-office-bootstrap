@@ -51,6 +51,25 @@ fi
 as_root=(sudo)
 if $unattended; then
     as_root+=(-n)
+    if ! "${as_root[@]}" /usr/bin/true 2>/dev/null; then
+        if ! ( : </dev/tty ) 2>/dev/null; then
+            echo 'Unattended provisioning needs non-interactive sudo when run without a terminal.' >&2
+            exit 1
+        fi
+        echo 'Authorize sudo once to start unattended setup.'
+        sudo -v </dev/tty || exit 1
+        "${as_root[@]}" /usr/bin/true || exit 1
+    fi
+    if ( : </dev/tty ) 2>/dev/null; then
+        # Keep the terminal's sudo credential valid during long downloads.
+        (
+            while sudo -n -v; do
+                sleep 60
+            done
+        ) </dev/null >/dev/null 2>&1 &
+        sudo_refresh_pid=$!
+        trap 'kill "$sudo_refresh_pid" 2>/dev/null || true' EXIT
+    fi
     exec </dev/null
 fi
 

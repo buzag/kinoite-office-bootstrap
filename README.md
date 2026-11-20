@@ -28,7 +28,7 @@ If a step fails, the installer attempts the rest and lists failed steps at the e
 curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh | bash -s -- --unattended --netbird-url netbird.example.com
 ```
 
-Replace `netbird.example.com` with your management server hostname or HTTPS URL. Run as the desktop user with non-interactive sudo authorization already configured by your provisioning system. Sudo authorization failures are reported without a password prompt.
+Replace `netbird.example.com` with your management server hostname or HTTPS URL. Run as the desktop user. When pasted into Konsole by a sudo-enabled user, the script asks for sudo authorization at the start if needed, then continues unattended. In Ventoy first-boot provisioning, the media builder supplies temporary passwordless sudo, and the script runs without a terminal or password prompt.
 
 NetBird starts using the supplied server as soon as the installed package is available, which may require the next reboot. The installer does not open a browser or wait for NetBird login. When ready to connect, open **NetBird** from the application menu or run `netbird up --management-url https://netbird.example.com` and complete browser sign-in. An existing profile for a different server is preserved and reported as a failed NetBird step.
 

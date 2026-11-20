@@ -223,6 +223,10 @@ if [[ $phase == apps ]]; then
         loginctl disable-linger "$username" || :
     }
     trap cleanup_setup EXIT
+    if ! runuser -u "$username" -- /usr/bin/sudo -n /usr/bin/true; then
+        echo "Temporary sudo authorization failed for $username. Check /etc/sudoers and its included rules." >&2
+        exit 1
+    fi
     loginctl enable-linger "$username"
     systemctl start "user@${uid}.service"
     mkdir -p "/run/user/$uid"
