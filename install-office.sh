@@ -59,11 +59,49 @@ download() {
         --location --retry 3 --output "$2" "$1"
 }
 
+install_anyk_launcher() {
+    local destination=$1
+    local applications="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    local desktop_path
+    desktop_path=$(printf '%s' "$destination" | sed 's/\\/\\\\/g') || return
+    mkdir -p "$applications" || return
+    cat > "$applications/kinoite-office-anyk.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=ÁNYK (AbevJava)
+Comment=NAV nyomtatványkitöltő
+Keywords=ÁNYK;ANYK;AbevJava;NAV;
+Icon=office-document
+Path=$desktop_path
+Exec=/usr/bin/bash ./abevjava_start
+Terminal=false
+Categories=Office;
+DESKTOP
+}
+
 install_anyk() (
     destination="$HOME/abevjava"
     if [[ -s "$destination/abevjava.jar" && -x "$destination/abevjava_start" && -f "$destination/setenv" ]]; then
         echo "ÁNYK is already installed in $destination."
-        exit 0
+        install_anyk_launcher "$destination"
+        exit $?
+    fi
+
+    path_config="$HOME/.abevjava/abevjavapath.cfg"
+    if [[ -f "$path_config" ]]; then
+        configured_path=$(sed -n 's/^[[:space:]]*abevjava\.path[[:space:]]*=[[:space:]]*//p' "$path_config" | tail -n 1)
+        if [[ $configured_path != "$destination" ]]; then
+            if [[ $configured_path == /* && -s "$configured_path/abevjava.jar" && -x "$configured_path/abevjava_start" ]]; then
+                echo "ÁNYK is already installed in $configured_path."
+                install_anyk_launcher "$configured_path"
+                exit $?
+            fi
+            echo "ÁNYK has a different installation path in $path_config. Check it before retrying." >&2
+            exit 1
+        fi
+    else
+        mkdir -p "$HOME/.abevjava" || exit 1
+        (set -o noclobber; printf 'abevjava.path=%s\n' "$destination" > "$path_config") || exit 1
     fi
 
     java_root="${XDG_DATA_HOME:-$HOME/.local/share}/kinoite-anyk"
@@ -83,22 +121,6 @@ install_anyk() (
     fi
 
     download 'https://nav.gov.hu/pfile/programFile?path=/nyomtatvanyok/letoltesek/nyomtatvanykitolto_programok/nyomtatvany_apeh/keretprogramok/AbevJava' "$workdir/abevjava_install.jar" || exit 1
-    path_config="$HOME/.abevjava/abevjavapath.cfg"
-    if [[ -f "$path_config" ]]; then
-        configured_path=$(sed -n 's/^[[:space:]]*abevjava\.path[[:space:]]*=[[:space:]]*//p' "$path_config" | tail -n 1)
-        if [[ $configured_path != "$destination" ]]; then
-            if [[ $configured_path == /* && -f "$configured_path/abevjava.jar" ]]; then
-                echo "ÁNYK is already installed in $configured_path."
-                exit 0
-            fi
-            echo "ÁNYK has a different installation path in $path_config. Check it before retrying." >&2
-            exit 1
-        fi
-    else
-        mkdir -p "$HOME/.abevjava" || exit 1
-        (set -o noclobber; printf 'abevjava.path=%s\n' "$destination" > "$path_config") || exit 1
-    fi
-
     JAVA_HOME="$java_home" PATH="$java_home/bin:$PATH" "$java_home/bin/java" \
         -Duser.home="$HOME" -Djava.awt.headless=true -jar "$workdir/abevjava_install.jar" -s </dev/null || exit 1
 
@@ -111,7 +133,8 @@ install_anyk() (
     if ! grep -q '^JAVA_HOME_ABEV=' "$destination/setenv"; then
         printf '\n%s\n' 'JAVA_HOME_ABEV="${XDG_DATA_HOME:-$HOME/.local/share}/kinoite-anyk/temurin-8u514-b01/bin/"' >> "$destination/setenv" || exit 1
     fi
-    echo "Launch ÁNYK with: cd \"$destination\" && ./abevjava_start"
+    install_anyk_launcher "$destination" || exit 1
+    echo 'Open ÁNYK (AbevJava) from the application menu.'
 )
 
 install_desktop_defaults() (
@@ -361,59 +384,6 @@ REPO
     fi
 }
 
-install_chatgpt() {
-    local key=/etc/pki/rpm-gpg/RPM-GPG-KEY-chatgpt-3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4.asc
-
-    # Same public signing key and repository shipped in OpenAI's Fedora RPM.
-    if [[ ! -e "$key" ]]; then
-        "${as_root[@]}" install -d -m 0755 /etc/pki/rpm-gpg || return
-        "${as_root[@]}" tee "$key" >/dev/null <<'KEY' || return
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-mQINBGpypFUBEACi1Vvzq9pIpA6lj7chbqELuxJtVuzUzxrasa6ZU0yF4yhq7jf8
-3YkJRHwbezBKeQyzJ5lkX0EhXS8aXxUhMAm3PFpAlwcInfKzmV7atJwvaxIw6Rmd
-GYe9fBWKjTN/SmPIjtyxrTznZY97+TfD1AeGZpLaJ8fsnhrC+HkiN2TACiTocgpe
-hFiP0OWK7mWZeTWnY2scpIYXP1Ro7nQv4KacmY4JacTQ7m/HM0Qej/3olhuEv2Cw
-lMVWw57/oHhmTllfLDQOogFQyIVqaaR98y/Eu6cAabSfcsqAAZ2A8vfHYD27z28J
-vLO2PZEJd5ThlnX4Zqv0eIpZdBj//8Sl/MSqTshFZ1NDsRoqwdqw284X5MpnOJ4k
-4Sc2Se8tJxt/nCeibH3dJ504Fb1X/mnOqhCAQ6pVJz4RB5HRlFPSkxVPyag1v1m/
-7T4vie+OR4eqFQNz6mudrOoMmeVIfyL5fbe4cOr4fk/FyvEE2xMgkFatPqXn7vM9
-og+zremPCfwRAFpBPyX74VowFY7llcdaj/w8K5T8PzM14Hb3E4ZKizMluKmTvTq9
-WE1/eSQJLLQqXD5VmtmdUaC/VyE/1ZlIxcA1LWqvEQ327UXREvX/nHsrkKrl956W
-jzkiHFUTsD1NJ0dMfs+csOt8Furb5jZj+HsMmCm9jLdfz5b/4WKLPbvxIwARAQAB
-tBZDb2RleCBMaW51eCBSZXBvc2l0b3J5iQJRBBMBCgA7FiEEO/oOSui4zBai2bpo
-SjtKVmxGYOQFAmpypFUCGwMFCwkIBwICIgIGFQoJCAsCBBYCAwECHgcCF4AACgkQ
-SjtKVmxGYORlCQ/9FyikZo8HQcJBP9E/oXVPds/fQnIFB2qJR2z3DrfYEonNt/ev
-SAySkPPq4/mEOjaI0pFlDDGSaps+FTcJFgoVRTasBIF7JJivvjW9ap8iWEbhhVLe
-IrFLbMLpUcTRntUx7R4fVMJ/1/cGn+NWZmNwS9ORorzSyCH0IAgCw1Xc3ZrjuMbF
-VjdToMC1TiXXCEmlYpQakmQ3Ay1cH0FHC2BBNn1MNVkJdPhpZIZCdhaMPHfYFpyo
-pg8wFvZ5iIcvlbMgyuy8CPJVRWUcYy2dOhEOGnYJnXRPkE3E1hf8YOHNzRlduH89
-6lT9qcEK2+fpLfrVGoc4zscLZ+Ey+Ko6iQRdVE1j67+wNR3hX8ukue574v1N/xxu
-i575jumSE19lEj1sH4+P4gFHOtTbF0JhKKzLctbga0IAwTPKhnt3qzj1U5Yj/MZS
-uEVjrLhdRauOuFBXUclgyVf2w/lE85UUOdlcollsYA6Huq7xDamqf8SslZQGre3E
-I+lhpqJR1cOwDMUzzcl40uTyhrxXXd/bk4QSlhZbwHR25Pnt+ZMtWavlQWS0eDEV
-8djuXAURCmx5WOqAFB/TJe1mn5EvyWg4VFzrY/NVNOpzgY5+Xp7J28z7f637r712
-Eu9j4imVcdPigwS+jf/0f81i2o9b82Y26TN8+EtDLCY841MJ1lrjDrX/dno=
-=Y+3h
------END PGP PUBLIC KEY BLOCK-----
-KEY
-    fi
-    if [[ ! -e /etc/yum.repos.d/chatgpt.repo ]]; then
-        "${as_root[@]}" tee /etc/yum.repos.d/chatgpt.repo >/dev/null <<'REPO' || return
-[openai-chatgpt]
-name=ChatGPT
-baseurl=https://persistent.oaistatic.com/codex-app-prod/linux/rpm/$basearch
-enabled=1
-type=rpm-md
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-chatgpt-3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4.asc
-REPO
-    fi
-    "${as_root[@]}" rpm-ostree install --idempotent --allow-inactive chatgpt || return
-    echo 'If ChatGPT was newly staged, reboot and open ChatGPT from the application menu. Select Codex after signing in.'
-}
-
 failed=()
 install_step() {
     local label=$1
@@ -428,7 +398,6 @@ install_step() {
 }
 
 install_step NetBird install_netbird
-install_step 'ChatGPT desktop with Codex' install_chatgpt
 
 install_step Flathub flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 if rpm -q google-chrome-stable >/dev/null 2>&1 || flatpak info com.google.Chrome >/dev/null 2>&1; then

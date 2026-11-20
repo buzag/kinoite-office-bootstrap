@@ -4,7 +4,7 @@ On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as 
 
 ## Office apps and ÁNYK
 
-Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, ChatGPT desktop with Codex, and ÁNYK (AbevJava).
+Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, and ÁNYK (AbevJava).
 
 With non-interactive sudo access, new accounts get the identiGO / SzékhelySzolgálat wallpaper on their first Plasma login. If that setup is unavailable, the installer queues the wallpaper for the current user instead. The current user’s Firefox, Discover, and System Settings panel shortcuts are removed at the next Plasma login. Other shortcuts stay in place.
 
@@ -20,9 +20,7 @@ Discover can update all five Flatpak apps in the background when **Unattended Up
 
 If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. NetBird is installed as a system service with a command-line client. After reboot, use `netbird version` to check that it is available.
 
-ChatGPT desktop is layered from OpenAI’s signed RPM repository so it can update with the system. After reboot, open **ChatGPT**, sign in, and select **Codex**. OpenAI’s Linux desktop app is in preview. Its documented Fedora support is for Fedora 43 and 44. See the [OpenAI Linux desktop guide](https://learn.chatgpt.com/docs/linux/linux-app).
-
-ÁNYK installs silently into `$HOME/abevjava` with a per-user Temurin Java 8 runtime. The installer skips existing installations. Launch it with `cd "$HOME/abevjava" && ./abevjava_start` after a fresh install. If setup fails, check `$HOME/abevjava_silent_install.log`. See [NAV’s installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2FTelepitesi_leiras_2017.12.13._).
+ÁNYK installs silently into `$HOME/abevjava` with a per-user Temurin Java 8 runtime. The installer adds a searchable **ÁNYK (AbevJava)** shortcut to the current user’s application menu, including when the app is already installed. If setup fails, check `$HOME/abevjava_silent_install.log`. See [NAV’s installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2FTelepitesi_leiras_2017.12.13._).
 
 ### Unattended provisioning
 

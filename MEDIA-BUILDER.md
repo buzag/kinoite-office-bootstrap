@@ -50,7 +50,7 @@ The target's secondary user is not permanently an admin. A `NOPASSWD` sudoers ru
 - Target needs internet access for updates and apps. The Wi-Fi profile supports WPA/WPA2 personal (`wpa-psk`), not enterprise Wi-Fi or some newer WPA3-only setups.
 - **Secrets:** The Wi-Fi PSK and administrator hash are stored on the unencrypted `OEMDRV` USB. During installation, the newly entered LUKS passphrase temporarily appears in a generated Kickstart fragment in installer RAM, where privileged installer code could access it. Avoid booting untrusted media. LUKS unlocking is required at every boot.
 - After script failure the setup phase retries on the next boot; check `/var/log/kinoite-provision.log`. Automatic retries of non-idempotent third-party app installers may need manual repair.
-- Fedora Kinoite RPM layering in `install-office.sh` may stage another deployment requiring an additional reboot before NetBird and ChatGPT can be launched.
+- Fedora Kinoite RPM layering in `install-office.sh` may stage another deployment requiring an additional reboot before NetBird can be launched.
 - The ISO URL may become unavailable after a new Fedora release. Verify release availability on https://fedoraproject.org/atomic-desktops/kinoite/download/.
 
 ## Validation status
