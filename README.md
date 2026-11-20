@@ -7,7 +7,7 @@ On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as 
 Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, ChatGPT desktop with Codex, and ÁNYK (AbevJava).
 
 ```bash
-( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/main/install-office.sh' -o "$f" && bash "$f" )
+( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh' -o "$f" && bash "$f" )
 ```
 
 After reboot, run `sudo systemctl enable --now netbird`, then `netbird up` to sign in. For a self-hosted setup, use `netbird up --management-url https://YOUR-NETBIRD-SERVER`. Open Dropbox and Discord from the application menu to sign in.
@@ -25,7 +25,7 @@ For ÁNYK, the script downloads the official NAV installer and opens its setup w
 ## Brother ADS-4100 scanner
 
 ```bash
-( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/main/install-scanner.sh' -o "$f" && bash "$f" )
+( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-scanner.sh' -o "$f" && bash "$f" )
 ```
 
 Review the [Brother driver license](https://support.brother.com/g/s/agreement/English_lpr/agree.html) before accepting it in the terminal. The installer layers Brother's `brscan5` RPM, SANE tools, and Skanpage. After reboot, connect and power on the scanner over USB, run `scanimage -L`, then test a multi-page scan in Skanpage.
