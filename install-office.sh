@@ -234,14 +234,19 @@ fi
 panel_script=$(cat <<JS
 const removeDefaultBrowser = $remove_default_browser;
 const chromeId = "$chrome_id";
-const defaults = "applications:systemsettings.desktop,applications:org.kde.discover.desktop,preferred://filemanager,preferred://browser";
+const defaults = ["applications:systemsettings.desktop", "applications:org.kde.discover.desktop", "preferred://filemanager", "preferred://browser"];
+let taskManagers = 0;
 for (const panel of panels()) {
     for (const widget of panel.widgets()) {
         if (!["org.kde.plasma.icontasks", "org.kde.plasma.taskmanager"].includes(widget.type)) {
             continue;
         }
+        taskManagers++;
         widget.currentConfigGroup = ["General"];
-        const launchers = String(widget.readConfig("launchers", defaults)).split(",");
+        const stored = widget.readConfig("launchers", defaults);
+        const entries = Array.isArray(stored) ? stored : [String(stored)];
+        // Repair lists written as a single comma-separated launcher by older installers.
+        const launchers = entries.flatMap((entry) => entry.split(/,(?=applications:|preferred:|file:)/)).filter(Boolean);
         const remaining = launchers.filter((launcher) => {
             const id = launcher.split("?")[0].split(/[/:]/).pop().toLowerCase();
             if (removeDefaultBrowser && launcher === "preferred://browser") return false;
@@ -250,11 +255,20 @@ for (const panel of panels()) {
         if (chromeId && !remaining.some((launcher) => launcher.split("?")[0] === "applications:" + chromeId)) {
             remaining.push("applications:" + chromeId);
         }
-        if (remaining.join(",") !== launchers.join(",")) {
-            widget.writeConfig("launchers", remaining.join(","));
+        const fileManager = remaining.indexOf("preferred://filemanager");
+        if (!remaining.some((launcher) => launcher.split("?")[0] === "applications:org.kde.dolphin.desktop")) {
+            if (fileManager >= 0) {
+                remaining[fileManager] = "applications:org.kde.dolphin.desktop";
+            } else {
+                remaining.push("applications:org.kde.dolphin.desktop");
+            }
+        }
+        if (JSON.stringify(remaining) !== JSON.stringify(entries)) {
+            widget.writeConfig("launchers", remaining);
         }
     }
 }
+if (!taskManagers) throw new Error("Waiting for the Plasma task manager");
 JS
 )
 for ((attempt = 0; attempt < 30; attempt++)); do
