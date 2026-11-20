@@ -6,7 +6,7 @@ On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as 
 
 Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, ChatGPT desktop with Codex, and ÁNYK (AbevJava).
 
-Accounts created after running the office installer get the identiGO / SzékhelySzolgálat wallpaper on their first Plasma login. Users can change it afterwards.
+With non-interactive sudo access, new accounts get the identiGO / SzékhelySzolgálat wallpaper on their first Plasma login. If that setup is unavailable, the installer queues the wallpaper for the current user instead. The current user’s Firefox, Discover, and System Settings panel shortcuts are removed at the next Plasma login. Other shortcuts stay in place.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh | bash
@@ -43,3 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs
 ```
 
 Review the [Brother driver license](https://support.brother.com/g/s/agreement/English_lpr/agree.html) before accepting it in the terminal. The installer layers Brother's `brscan5` RPM, SANE tools, and Skanpage. After reboot, connect and power on the scanner over USB, run `scanimage -L`, then test a multi-page scan in Skanpage.
+
+## Installation media builder
+
+The experimental [installation media builder](MEDIA-BUILDER.md) prepares a Fedora Kinoite installer USB and an OEMDRV configuration USB.

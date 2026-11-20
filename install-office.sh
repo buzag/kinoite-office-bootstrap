@@ -114,7 +114,7 @@ install_anyk() (
     echo "Launch ÁNYK with: cd \"$destination\" && ./abevjava_start"
 )
 
-install_default_wallpaper() (
+install_desktop_defaults() (
     local workdir shared_dir=/var/local/kinoite-office-bootstrap
     local autostart=/etc/skel/.config/autostart
     workdir=$(mktemp -d) || exit 1
@@ -144,11 +144,79 @@ TryExec=plasma-apply-wallpaperimage
 Exec=/usr/bin/bash /var/local/kinoite-office-bootstrap/apply-wallpaper
 DESKTOP
 
-    "${as_root[@]}" install -d -m 0755 "$shared_dir" || exit 1
-    "${as_root[@]}" mkdir -p "$autostart" || exit 1
-    "${as_root[@]}" install -m 0644 "$workdir/wallpaper.png" "$shared_dir/identigo-szekhely-wallpaper.png" || exit 1
-    "${as_root[@]}" install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" || exit 1
-    "${as_root[@]}" install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"
+    user_dir="$HOME/.local/share/kinoite-office-bootstrap"
+    user_autostart="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+    mkdir -p "$user_dir" "$user_autostart" || exit 1
+
+    # System-wide defaults are optional and must never start a sudo prompt.
+    if sudo -n install -d -m 0755 "$shared_dir" &&
+       sudo -n mkdir -p "$autostart" &&
+       sudo -n install -m 0644 "$workdir/wallpaper.png" "$shared_dir/identigo-szekhely-wallpaper.png" &&
+       sudo -n install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" &&
+       sudo -n install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"; then
+        echo 'Installed the default wallpaper for new accounts.'
+    else
+        echo 'System-wide wallpaper setup unavailable. Applying it for this user.'
+        install -m 0644 "$workdir/wallpaper.png" "$user_dir/identigo-szekhely-wallpaper.png" || exit 1
+    fi
+
+    cat > "$user_dir/apply-desktop" <<'SCRIPT' || exit 1
+#!/usr/bin/env bash
+set -euo pipefail
+user_dir="$HOME/.local/share/kinoite-office-bootstrap"
+wallpaper="$user_dir/identigo-szekhely-wallpaper.png"
+
+# A generic browser pin represents Firefox on stock Kinoite.
+browser=$(xdg-settings get default-web-browser 2>/dev/null || true)
+remove_default_browser=false
+case "$browser" in
+    ''|firefox.desktop|org.mozilla.firefox.desktop) remove_default_browser=true ;;
+esac
+
+panel_script=$(cat <<JS
+const removeDefaultBrowser = $remove_default_browser;
+const defaults = "applications:systemsettings.desktop,applications:org.kde.discover.desktop,preferred://filemanager,preferred://browser";
+for (const panel of panels()) {
+    for (const widget of panel.widgets()) {
+        if (!["org.kde.plasma.icontasks", "org.kde.plasma.taskmanager"].includes(widget.type)) {
+            continue;
+        }
+        widget.currentConfigGroup = ["General"];
+        const launchers = String(widget.readConfig("launchers", defaults)).split(",");
+        const remaining = launchers.filter((launcher) => {
+            const id = launcher.split("?")[0].split(/[/:]/).pop().toLowerCase();
+            if (removeDefaultBrowser && launcher === "preferred://browser") return false;
+            return !/^(firefox|org\.mozilla\.firefox|org\.kde\.discover|systemsettings|org\.kde\.systemsettings)\.desktop$/.test(id);
+        });
+        if (remaining.length !== launchers.length) {
+            widget.writeConfig("launchers", remaining.join(","));
+        }
+    }
+}
+JS
+)
+for ((attempt = 0; attempt < 30; attempt++)); do
+    if busctl --user --timeout=5s call org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell evaluateScript s "$panel_script"; then
+        if [[ -f "$wallpaper" ]]; then
+            plasma-apply-wallpaperimage "$wallpaper"
+        fi
+        rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/kinoite-office-desktop.desktop"
+        exit
+    fi
+    sleep 2
+done
+exit 1
+SCRIPT
+
+    cat > "$user_autostart/kinoite-office-desktop.desktop" <<'DESKTOP' || exit 1
+[Desktop Entry]
+Type=Application
+Name=Apply office desktop defaults
+OnlyShowIn=KDE;
+Exec=/usr/bin/bash -c "exec /usr/bin/bash ~/.local/share/kinoite-office-bootstrap/apply-desktop"
+DESKTOP
+    echo 'Panel shortcuts will be updated at the next Plasma login.'
+
 )
 
 install_craft_app() {
@@ -375,7 +443,7 @@ install_step WordCraft install_craft_app wordcraft
 install_step GridCraft install_craft_app gridcraft
 
 install_step ÁNYK install_anyk
-install_step 'Default wallpaper for new users' install_default_wallpaper
+install_step 'Wallpaper and panel shortcuts' install_desktop_defaults
 
 if (( ${#failed[@]} )); then
     printf '\nFailed steps:\n' >&2
