@@ -24,6 +24,18 @@ ChatGPT desktop is layered from OpenAI’s signed RPM repository so it can updat
 
 ÁNYK installs silently into `$HOME/abevjava` with a per-user Temurin Java 8 runtime. The installer skips existing installations. Launch it with `cd "$HOME/abevjava" && ./abevjava_start` after a fresh install. If setup fails, check `$HOME/abevjava_silent_install.log`. See [NAV’s installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2FTelepitesi_leiras_2017.12.13._).
 
+### Unattended provisioning
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh | bash -s -- --unattended --netbird-url netbird.example.com
+```
+
+Replace `netbird.example.com` with your management server hostname or HTTPS URL. Run as the desktop user with non-interactive sudo authorization already configured by your provisioning system. Sudo authorization failures are reported without a password prompt.
+
+NetBird starts using the supplied server as soon as the installed package is available, which may require the next reboot. The installer does not open a browser or wait for NetBird login. When ready to connect, the user can run `netbird up --management-url https://netbird.example.com` and complete browser sign-in. An existing profile for a different server is preserved and reported as a failed NetBird step.
+
+You can rerun the same command between reboots. A rerun reuses the NetBird profile for the same server. The script attempts the remaining installers after a failed step and exits with a nonzero status if any step fails. Your provisioning system controls when to reboot.
+
 ## Brother ADS-4100 scanner
 
 ```bash

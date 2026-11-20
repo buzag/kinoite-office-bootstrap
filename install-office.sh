@@ -3,9 +3,55 @@
 {
 set -euo pipefail
 
+unattended=false
+server_url=''
+server_pattern='^https://([[:alnum:]-]+(\.[[:alnum:]-]+)*|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?/?$'
+
+normalize_netbird_url() {
+    local url=$1
+    [[ $url == *://* ]] || url="https://$url"
+    [[ $url =~ $server_pattern ]] || return 1
+    printf '%s\n' "${url%/}"
+}
+
+while (( $# )); do
+    case "$1" in
+        --unattended)
+            unattended=true
+            shift
+            ;;
+        --netbird-url)
+            if (( $# < 2 )) || ! server_url=$(normalize_netbird_url "$2"); then
+                echo 'Pass a NetBird hostname or HTTPS URL to --netbird-url.' >&2
+                exit 2
+            fi
+            shift 2
+            ;;
+        -h|--help)
+            echo 'Usage: install-office.sh [--unattended --netbird-url HOST_OR_HTTPS_URL]'
+            exit
+            ;;
+        *)
+            printf 'Unknown option: %s\n' "$1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+if $unattended && [[ -z $server_url ]]; then
+    echo '--unattended requires --netbird-url HOST_OR_HTTPS_URL.' >&2
+    exit 2
+fi
+
 if [[ $(uname -m) != x86_64 || ! -e /run/ostree-booted || $EUID == 0 ]]; then
     echo 'Run this as your regular user on installed x86_64 Fedora Kinoite.' >&2
     exit 1
+fi
+
+as_root=(sudo)
+if $unattended; then
+    as_root+=(-n)
+    exec </dev/null
 fi
 
 download() {
@@ -98,11 +144,11 @@ TryExec=plasma-apply-wallpaperimage
 Exec=/usr/bin/bash /var/local/kinoite-office-bootstrap/apply-wallpaper
 DESKTOP
 
-    sudo install -d -m 0755 "$shared_dir" || exit 1
-    sudo mkdir -p "$autostart" || exit 1
-    sudo install -m 0644 "$workdir/wallpaper.png" "$shared_dir/identigo-szekhely-wallpaper.png" || exit 1
-    sudo install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" || exit 1
-    sudo install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"
+    "${as_root[@]}" install -d -m 0755 "$shared_dir" || exit 1
+    "${as_root[@]}" mkdir -p "$autostart" || exit 1
+    "${as_root[@]}" install -m 0644 "$workdir/wallpaper.png" "$shared_dir/identigo-szekhely-wallpaper.png" || exit 1
+    "${as_root[@]}" install -m 0644 "$workdir/apply-wallpaper" "$shared_dir/apply-wallpaper" || exit 1
+    "${as_root[@]}" install -m 0644 "$workdir/kinoite-office-wallpaper.desktop" "$autostart/"
 )
 
 install_craft_app() {
@@ -122,14 +168,14 @@ install_craft_app() {
 enable_netbird_service() {
     if [[ -x /usr/bin/netbird ]]; then
         if [[ $(systemctl show --property=LoadState --value netbird.service) == not-found ]]; then
-            sudo /usr/bin/netbird service install || return
+            "${as_root[@]}" /usr/bin/netbird service install || return
         fi
-        sudo systemctl enable --now netbird.service
+        "${as_root[@]}" systemctl enable --now --no-block netbird.service
         return
     fi
 
     # The RPM is staged, so its executable may only exist after reboot.
-    sudo tee /etc/systemd/system/office-netbird-enable.service >/dev/null <<'UNIT' || return
+    "${as_root[@]}" tee /etc/systemd/system/office-netbird-enable.service >/dev/null <<'UNIT' || return
 [Unit]
 Description=Enable NetBird after the staged RPM is booted
 ConditionPathIsExecutable=/usr/bin/netbird
@@ -142,7 +188,7 @@ ExecStartPost=/usr/bin/systemctl --no-reload disable office-netbird-enable.servi
 [Install]
 WantedBy=multi-user.target
 UNIT
-    sudo systemctl enable office-netbird-enable.service
+    "${as_root[@]}" systemctl enable office-netbird-enable.service
 }
 
 schedule_netbird_signin() {
@@ -173,16 +219,46 @@ UNIT
     fi
 }
 
+seed_netbird_profile() {
+    "${as_root[@]}" python3 - "$1" <<'PYTHON'
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+from urllib.parse import urlsplit
+
+url = urlsplit(sys.argv[1])
+profile = Path("/var/lib/netbird/default.json")
+server = {"Scheme": url.scheme, "Host": url.netloc}
+if profile.exists():
+    with profile.open() as source:
+        current = json.load(source).get("ManagementURL") or {}
+    current_host = current.get("Host", "").lower().removesuffix(":443")
+    if current.get("Scheme") == url.scheme and current_host == url.netloc.lower().removesuffix(":443"):
+        sys.exit(0)
+    sys.exit("NetBird already has a profile for another server. Existing settings were preserved.")
+
+if Path("/etc/netbird/config.json").exists() or (profile.parent / "active_profile.json").exists():
+    sys.exit("NetBird already has configuration state. Existing settings were preserved.")
+
+os.umask(0o077)
+profile.parent.mkdir(parents=True, exist_ok=True)
+# Publish the complete file atomically without overwriting an existing profile.
+with tempfile.NamedTemporaryFile(mode="w", dir=profile.parent) as target:
+    json.dump({"ManagementURL": server, "AdminURL": server}, target)
+    target.write("\n")
+    target.flush()
+    os.link(target.name, profile)
+PYTHON
+}
+
 install_netbird() {
-    local url=''
-    local server_pattern='^https://([[:alnum:]-]+(\.[[:alnum:]-]+)*|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?/?$'
-    if ! netbird status --check ready >/dev/null 2>&1; then
+    local url=$server_url
+    if [[ -z $url ]] && ! netbird status --check ready >/dev/null 2>&1; then
         while true; do
             read -r -p 'NetBird server URL (Enter for NetBird Cloud): ' url </dev/tty || return
-            url=${url:-https://api.netbird.io:443}
-            [[ $url == *://* ]] || url="https://$url"
-            if [[ $url =~ $server_pattern ]]; then
-                url=${url%/}
+            if url=$(normalize_netbird_url "${url:-https://api.netbird.io:443}"); then
                 break
             fi
             echo 'Enter a hostname or an HTTPS URL, optionally with a port.' >&2
@@ -190,7 +266,7 @@ install_netbird() {
     fi
 
     if [[ ! -e /etc/yum.repos.d/netbird.repo ]]; then
-        sudo tee /etc/yum.repos.d/netbird.repo >/dev/null <<'REPO' || return
+        "${as_root[@]}" tee /etc/yum.repos.d/netbird.repo >/dev/null <<'REPO' || return
 [netbird]
 name=NetBird
 baseurl=https://pkgs.netbird.io/yum/
@@ -200,7 +276,15 @@ repo_gpgcheck=1
 gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
 REPO
     fi
-    sudo rpm-ostree install --idempotent --allow-inactive netbird || return
+    "${as_root[@]}" rpm-ostree install --idempotent --allow-inactive netbird || return
+    if $unattended; then
+        seed_netbird_profile "$url" || return
+        # Remove a pending browser login scheduled by an earlier interactive run.
+        rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/graphical-session.target.wants/office-netbird-signin.service" || return
+        enable_netbird_service || return
+        printf 'NetBird sign-in is deferred. To connect later: netbird up --management-url %q\n' "$url"
+        return
+    fi
     enable_netbird_service || return
     if [[ -n $url ]]; then
         schedule_netbird_signin "$url"
@@ -214,8 +298,8 @@ install_chatgpt() {
 
     # Same public signing key and repository shipped in OpenAI's Fedora RPM.
     if [[ ! -e "$key" ]]; then
-        sudo install -d -m 0755 /etc/pki/rpm-gpg || return
-        sudo tee "$key" >/dev/null <<'KEY' || return
+        "${as_root[@]}" install -d -m 0755 /etc/pki/rpm-gpg || return
+        "${as_root[@]}" tee "$key" >/dev/null <<'KEY' || return
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBGpypFUBEACi1Vvzq9pIpA6lj7chbqELuxJtVuzUzxrasa6ZU0yF4yhq7jf8
@@ -247,7 +331,7 @@ Eu9j4imVcdPigwS+jf/0f81i2o9b82Y26TN8+EtDLCY841MJ1lrjDrX/dno=
 KEY
     fi
     if [[ ! -e /etc/yum.repos.d/chatgpt.repo ]]; then
-        sudo tee /etc/yum.repos.d/chatgpt.repo >/dev/null <<'REPO' || return
+        "${as_root[@]}" tee /etc/yum.repos.d/chatgpt.repo >/dev/null <<'REPO' || return
 [openai-chatgpt]
 name=ChatGPT
 baseurl=https://persistent.oaistatic.com/codex-app-prod/linux/rpm/$basearch
@@ -258,7 +342,7 @@ repo_gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-chatgpt-3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4.asc
 REPO
     fi
-    sudo rpm-ostree install --idempotent --allow-inactive chatgpt || return
+    "${as_root[@]}" rpm-ostree install --idempotent --allow-inactive chatgpt || return
     echo 'If ChatGPT was newly staged, reboot and open ChatGPT from the application menu. Select Codex after signing in.'
 }
 
@@ -282,10 +366,10 @@ install_step Flathub flatpak remote-add --user --if-not-exists flathub https://f
 if rpm -q google-chrome-stable >/dev/null 2>&1 || flatpak info com.google.Chrome >/dev/null 2>&1; then
     echo 'OK: Google Chrome is already installed.'
 else
-    install_step 'Google Chrome' flatpak install --user --noninteractive flathub com.google.Chrome
+    install_step 'Google Chrome' flatpak install --user --noninteractive --assumeyes flathub com.google.Chrome
 fi
-install_step Dropbox flatpak install --user --noninteractive flathub com.dropbox.Client
-install_step Discord flatpak install --user --noninteractive flathub com.discordapp.Discord
+install_step Dropbox flatpak install --user --noninteractive --assumeyes flathub com.dropbox.Client
+install_step Discord flatpak install --user --noninteractive --assumeyes flathub com.discordapp.Discord
 install_step 'ArtCraft repository' flatpak remote-add --user --if-not-exists artcraft-oci https://getartcraft.com/artcraft-oci.flatpakrepo
 install_step WordCraft install_craft_app wordcraft
 install_step GridCraft install_craft_app gridcraft
