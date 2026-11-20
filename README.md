@@ -20,7 +20,7 @@ If a step fails, the installer attempts the rest and lists failed steps at the e
 
 ChatGPT desktop is layered from OpenAI’s signed RPM repository so it can update with the system. After reboot, open **ChatGPT**, sign in, and select **Codex**. OpenAI’s Linux desktop app is in preview. Its documented Fedora support is for Fedora 43 and 44. See the [OpenAI Linux desktop guide](https://learn.chatgpt.com/docs/linux/linux-app).
 
-For ÁNYK, the script downloads the official NAV installer and opens its setup window with a per-user Temurin Java 8 runtime. Set the installation directory to `$HOME/abevjava` (the script prints the full path) and select **Felhasználói beállítások elvégzése** in the setup options. Launch ÁNYK from its shortcut or run `cd "$HOME/abevjava" && ./abevjava_start`. The office installer skips ÁNYK if it is already set up in that directory. See the [NAV Linux installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2Ftelepitesi-leiras-linux-2021.10.21).
+ÁNYK installs silently into `$HOME/abevjava` with a per-user Temurin Java 8 runtime. The installer skips existing installations. Launch it with `cd "$HOME/abevjava" && ./abevjava_start` after a fresh install. If setup fails, check `$HOME/abevjava_silent_install.log`. See [NAV’s installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2FTelepitesi_leiras_2017.12.13._).
 
 ## Brother ADS-4100 scanner
 

@@ -15,14 +15,9 @@ download() {
 
 install_anyk() (
     destination="$HOME/abevjava"
-    if [[ -f "$destination/abevjava_start" && -f "$destination/setenv" ]]; then
+    if [[ -s "$destination/abevjava.jar" && -x "$destination/abevjava_start" && -f "$destination/setenv" ]]; then
         echo "ÁNYK is already installed in $destination."
         exit 0
-    fi
-
-    if [[ -z ${DISPLAY:-}${WAYLAND_DISPLAY:-} ]]; then
-        echo 'Open a terminal in your desktop session to launch the ÁNYK installer.' >&2
-        exit 1
     fi
 
     java_root="${XDG_DATA_HOME:-$HOME/.local/share}/kinoite-anyk"
@@ -42,11 +37,27 @@ install_anyk() (
     fi
 
     download 'https://nav.gov.hu/pfile/programFile?path=/nyomtatvanyok/letoltesek/nyomtatvanykitolto_programok/nyomtatvany_apeh/keretprogramok/AbevJava' "$workdir/abevjava_install.jar" || exit 1
-    echo "Set the installation directory to $destination, then complete NAV's setup."
-    JAVA_HOME="$java_home" PATH="$java_home/bin:$PATH" "$java_home/bin/java" -jar "$workdir/abevjava_install.jar" || exit 1
+    path_config="$HOME/.abevjava/abevjavapath.cfg"
+    if [[ -f "$path_config" ]]; then
+        configured_path=$(sed -n 's/^[[:space:]]*abevjava\.path[[:space:]]*=[[:space:]]*//p' "$path_config" | tail -n 1)
+        if [[ $configured_path != "$destination" ]]; then
+            if [[ $configured_path == /* && -f "$configured_path/abevjava.jar" ]]; then
+                echo "ÁNYK is already installed in $configured_path."
+                exit 0
+            fi
+            echo "ÁNYK has a different installation path in $path_config. Check it before retrying." >&2
+            exit 1
+        fi
+    else
+        mkdir -p "$HOME/.abevjava" || exit 1
+        (set -o noclobber; printf 'abevjava.path=%s\n' "$destination" > "$path_config") || exit 1
+    fi
 
-    if [[ ! -f "$destination/abevjava_start" || ! -f "$destination/setenv" ]]; then
-        echo "The NAV launcher was not found in $destination. Check the installer's selected directory." >&2
+    JAVA_HOME="$java_home" PATH="$java_home/bin:$PATH" "$java_home/bin/java" \
+        -Duser.home="$HOME" -Djava.awt.headless=true -jar "$workdir/abevjava_install.jar" -s </dev/null || exit 1
+
+    if [[ ! -s "$destination/abevjava.jar" || ! -x "$destination/abevjava_start" || ! -f "$destination/setenv" ]]; then
+        echo "ÁNYK installation is incomplete. See $HOME/abevjava_silent_install.log." >&2
         exit 1
     fi
 
@@ -54,7 +65,7 @@ install_anyk() (
     if ! grep -q '^JAVA_HOME_ABEV=' "$destination/setenv"; then
         printf '\n%s\n' 'JAVA_HOME_ABEV="${XDG_DATA_HOME:-$HOME/.local/share}/kinoite-anyk/temurin-8u514-b01/bin/"' >> "$destination/setenv" || exit 1
     fi
-    echo "Open ÁNYK from its installed shortcut, or run: cd \"$destination\" && ./abevjava_start"
+    echo "Launch ÁNYK with: cd \"$destination\" && ./abevjava_start"
 )
 
 install_craft_app() {
