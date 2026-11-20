@@ -167,8 +167,11 @@ install_desktop_defaults() (
 
     cat > "$workdir/apply-wallpaper" <<'SCRIPT' || exit 1
 #!/usr/bin/env bash
+wallpaper=/var/local/kinoite-office-bootstrap/identigo-szekhely-wallpaper.png
 for ((attempt = 0; attempt < 30; attempt++)); do
-    if plasma-apply-wallpaperimage /var/local/kinoite-office-bootstrap/identigo-szekhely-wallpaper.png; then
+    if plasma-apply-wallpaperimage "$wallpaper"; then
+        kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image || exit 1
+        kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper" || exit 1
         rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/kinoite-office-wallpaper.desktop"
         exit
     fi
@@ -241,6 +244,8 @@ for ((attempt = 0; attempt < 30; attempt++)); do
     if busctl --user --timeout=5s call org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell evaluateScript s "$panel_script"; then
         if [[ -f "$wallpaper" ]]; then
             plasma-apply-wallpaperimage "$wallpaper"
+            kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image
+            kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper"
         fi
         rm -f -- "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/kinoite-office-desktop.desktop"
         exit

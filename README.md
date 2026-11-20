@@ -8,7 +8,7 @@ Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, and ÁN
 
 The installer sets Chrome as the default browser for the current user and removes Firefox once Chrome is available. Firefox RPM removal takes effect after reboot.
 
-With non-interactive sudo access, new accounts get the identiGO / SzékhelySzolgálat wallpaper on their first Plasma login. If that setup is unavailable, the installer queues the wallpaper for the current user instead. The current user’s Firefox, Discover, and System Settings panel shortcuts are removed at the next Plasma login. Other shortcuts stay in place.
+With non-interactive sudo access, new accounts get the identiGO / SzékhelySzolgálat image as both the desktop and lock-screen wallpaper on their first Plasma login. If that setup is unavailable, the installer queues both wallpaper changes for the current user instead. The current user’s Firefox, Discover, and System Settings panel shortcuts are removed at the next Plasma login. Other shortcuts stay in place.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/refs/heads/main/install-office.sh | bash
