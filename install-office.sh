@@ -71,7 +71,76 @@ install_craft_app() {
     flatpak install --user --noninteractive --assumeyes artcraft-oci "$ref"
 }
 
+enable_netbird_service() {
+    if [[ -x /usr/bin/netbird ]]; then
+        if [[ $(systemctl show --property=LoadState --value netbird.service) == not-found ]]; then
+            sudo /usr/bin/netbird service install || return
+        fi
+        sudo systemctl enable --now netbird.service
+        return
+    fi
+
+    # The RPM is staged, so its executable may only exist after reboot.
+    sudo tee /etc/systemd/system/office-netbird-enable.service >/dev/null <<'UNIT' || return
+[Unit]
+Description=Enable NetBird after the staged RPM is booted
+ConditionPathIsExecutable=/usr/bin/netbird
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c 'if [[ $(systemctl show --property=LoadState --value netbird.service) == not-found ]]; then /usr/bin/netbird service install || exit 1; fi; exec systemctl enable --now netbird.service'
+ExecStartPost=/usr/bin/systemctl --no-reload disable office-netbird-enable.service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    sudo systemctl enable office-netbird-enable.service
+}
+
+schedule_netbird_signin() {
+    local url=$1
+    local units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    mkdir -p "$units" || return
+    cat > "$units/office-netbird-signin.service" <<UNIT || return
+[Unit]
+Description=Complete NetBird sign-in
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+ConditionPathIsExecutable=/usr/bin/netbird
+
+[Service]
+Type=exec
+RuntimeMaxSec=10min
+ExecStart=/usr/bin/bash -c 'for ((attempt=0; attempt<30; attempt++)); do if /usr/bin/netbird status --check live; then if /usr/bin/netbird status --check ready || /usr/bin/netbird up --management-url "$url"; then exec systemctl --user --no-reload disable office-netbird-signin.service; fi; exit 1; fi; sleep 2; done; exit 1'
+
+[Install]
+WantedBy=graphical-session.target
+UNIT
+    systemctl --user enable office-netbird-signin.service || return
+    if [[ -x /usr/bin/netbird ]]; then
+        systemctl --user start --no-block office-netbird-signin.service || return
+        echo 'Complete NetBird sign-in in the browser when it opens.'
+    else
+        echo 'After reboot and desktop login, complete NetBird sign-in in the browser when it opens.'
+    fi
+}
+
 install_netbird() {
+    local url=''
+    local server_pattern='^https://([[:alnum:]-]+(\.[[:alnum:]-]+)*|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?/?$'
+    if ! netbird status --check ready >/dev/null 2>&1; then
+        while true; do
+            read -r -p 'NetBird server URL (Enter for NetBird Cloud): ' url </dev/tty || return
+            url=${url:-https://api.netbird.io:443}
+            [[ $url == *://* ]] || url="https://$url"
+            if [[ $url =~ $server_pattern ]]; then
+                url=${url%/}
+                break
+            fi
+            echo 'Enter a hostname or an HTTPS URL, optionally with a port.' >&2
+        done
+    fi
+
     if [[ ! -e /etc/yum.repos.d/netbird.repo ]]; then
         sudo tee /etc/yum.repos.d/netbird.repo >/dev/null <<'REPO' || return
 [netbird]
@@ -84,7 +153,12 @@ gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
 REPO
     fi
     sudo rpm-ostree install --idempotent --allow-inactive netbird || return
-    echo 'If NetBird was newly staged, reboot. Then run: sudo systemctl enable --now netbird && netbird up'
+    enable_netbird_service || return
+    if [[ -n $url ]]; then
+        schedule_netbird_signin "$url"
+    else
+        echo 'NetBird is already configured.'
+    fi
 }
 
 install_chatgpt() {
