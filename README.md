@@ -2,9 +2,9 @@
 
 On an installed **64-bit Intel or AMD Fedora Kinoite** desktop, open Konsole as your regular user and copy the line for the setup you want. Each installer runs independently. The office and scanner installers ask for administrator access and need a reboot to activate system packages.
 
-## Office apps
+## Office apps and ÁNYK
 
-Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, and Discord.
+Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, Discord, ChatGPT desktop with Codex, and ÁNYK (AbevJava).
 
 ```bash
 ( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/main/install-office.sh' -o "$f" && bash "$f" )
@@ -18,13 +18,9 @@ Discover can update all five Flatpak apps in the background when **Unattended Up
 
 If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. NetBird is installed as a system service with a command-line client. After reboot, use `netbird version` to check that it is available.
 
-## ÁNYK (AbevJava)
+ChatGPT desktop is layered from OpenAI’s signed RPM repository so it can update with the system. After reboot, open **ChatGPT**, sign in, and select **Codex**. OpenAI’s Linux desktop app is in preview. Its documented Fedora support is for Fedora 43 and 44. See the [OpenAI Linux desktop guide](https://learn.chatgpt.com/docs/linux/linux-app).
 
-```bash
-( f=$(mktemp) && trap 'rm -f -- "$f"' EXIT && curl --proto '=https' --proto-redir '=https' -fsSL 'https://raw.githubusercontent.com/buzag/kinoite-office-bootstrap/main/install-anyk.sh' -o "$f" && bash "$f" )
-```
-
-The script downloads the official NAV installer and opens its setup window with a per-user Temurin Java 8 runtime. Set the installation directory to `$HOME/abevjava` (the script prints the full path) and select **Felhasználói beállítások elvégzése** in the setup options. Launch ÁNYK from its shortcut or run `cd "$HOME/abevjava" && ./abevjava_start`. No reboot is needed. See the [NAV Linux installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2Ftelepitesi-leiras-linux-2021.10.21).
+For ÁNYK, the script downloads the official NAV installer and opens its setup window with a per-user Temurin Java 8 runtime. Set the installation directory to `$HOME/abevjava` (the script prints the full path) and select **Felhasználói beállítások elvégzése** in the setup options. Launch ÁNYK from its shortcut or run `cd "$HOME/abevjava" && ./abevjava_start`. The office installer skips ÁNYK if it is already set up in that directory. See the [NAV Linux installation guide](https://nav.gov.hu/pfile/file?path=%2Fnyomtatvanyok%2Fletoltesek%2Fnyomtatvanykitolto_programok%2Fnyomtatvany_apeh%2Fkeretprogramok%2Fld_abevjava%2Ftelepitesi-leiras-linux-2021.10.21).
 
 ## Brother ADS-4100 scanner
 
