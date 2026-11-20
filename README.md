@@ -12,7 +12,9 @@ Installs NetBird, WordCraft, GridCraft, Google Chrome, Dropbox, and Discord.
 
 After reboot, run `sudo systemctl enable --now netbird`, then `netbird up` to sign in. For a self-hosted setup, use `netbird up --management-url https://YOUR-NETBIRD-SERVER`. Open Dropbox and Discord from the application menu to sign in.
 
-NetBird uses its signed RPM repository, Chrome uses Google's RPM, and Dropbox and Discord are installed per user from Flathub. WordCraft and GridCraft use checksum-pinned upstream Flatpak bundles.
+NetBird installs first from its signed RPM repository. Chrome, Dropbox, and Discord are installed per user from Flathub. An existing Chrome installation is reused. WordCraft and GridCraft use checksum-pinned upstream Flatpak bundles.
+
+If a step fails, the installer attempts the rest and lists failed steps at the end. You can rerun the same command. NetBird is installed as a system service with a command-line client. After reboot, use `netbird version` to check that it is available.
 
 ## ÁNYK (AbevJava)
 

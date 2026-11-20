@@ -20,19 +20,14 @@ install_craft_app() {
     if flatpak info --user "ai.storyteller.$app" >/dev/null 2>&1; then
         return
     fi
-    download "https://github.com/storytold/$app/releases/download/v$version/$app-$version-linux-x86_64.flatpak" "$bundle"
-    printf '%s  %s\n' "$checksum" "$bundle" | sha256sum --check
+    download "https://github.com/storytold/$app/releases/download/v$version/$app-$version-linux-x86_64.flatpak" "$bundle" || return
+    printf '%s  %s\n' "$checksum" "$bundle" | sha256sum --check || return
     flatpak install --user --noninteractive --bundle "$bundle"
 }
 
-sudo -v
-flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --user --noninteractive flathub com.discordapp.Discord com.dropbox.Client
-install_craft_app wordcraft 0.18.1 7f3923f3537c020521318307428211d80848cd9ccb055265b23d6139216616a9
-install_craft_app gridcraft 0.19.1 535289047c3891e5a238feaa186096ca3c0c283cdfde1e0fff72240f5f475d02
-
-if [[ ! -e /etc/yum.repos.d/netbird.repo ]]; then
-    sudo tee /etc/yum.repos.d/netbird.repo >/dev/null <<'REPO'
+install_netbird() {
+    if [[ ! -e /etc/yum.repos.d/netbird.repo ]]; then
+        sudo tee /etc/yum.repos.d/netbird.repo >/dev/null <<'REPO' || return
 [netbird]
 name=NetBird
 baseurl=https://pkgs.netbird.io/yum/
@@ -41,15 +36,39 @@ gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://pkgs.netbird.io/yum/repodata/repomd.xml.key
 REPO
-fi
+    fi
+    sudo rpm-ostree install --idempotent --allow-inactive netbird || return
+    echo 'If NetBird was newly staged, reboot. Then run: sudo systemctl enable --now netbird && netbird up'
+}
 
-packages=(netbird)
-if ! rpm -q google-chrome-stable >/dev/null; then
-    download https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm "$workdir/google-chrome.rpm"
-    [[ $(rpm -qp --queryformat '%{NAME}.%{ARCH}' "$workdir/google-chrome.rpm") == google-chrome-stable.x86_64 ]]
-    packages+=("$workdir/google-chrome.rpm")
-fi
-sudo rpm-ostree install --idempotent --allow-inactive "${packages[@]}"
+failed=()
+install_step() {
+    local label=$1
+    shift
+    printf '\n==> %s\n' "$label"
+    if "$@"; then
+        printf 'OK: %s\n' "$label"
+    else
+        printf 'Failed: %s\n' "$label" >&2
+        failed+=("$label")
+    fi
+}
 
-echo 'Reboot to activate the host packages. Then run: sudo systemctl enable --now netbird && netbird up'
-echo 'Launch Dropbox and Discord from the application menu to sign in.'
+install_step NetBird install_netbird
+
+install_step Flathub flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+if rpm -q google-chrome-stable >/dev/null 2>&1 || flatpak info com.google.Chrome >/dev/null 2>&1; then
+    echo 'OK: Google Chrome is already installed.'
+else
+    install_step 'Google Chrome' flatpak install --user --noninteractive flathub com.google.Chrome
+fi
+install_step Dropbox flatpak install --user --noninteractive flathub com.dropbox.Client
+install_step Discord flatpak install --user --noninteractive flathub com.discordapp.Discord
+install_step WordCraft install_craft_app wordcraft 0.18.1 7f3923f3537c020521318307428211d80848cd9ccb055265b23d6139216616a9
+install_step GridCraft install_craft_app gridcraft 0.19.1 535289047c3891e5a238feaa186096ca3c0c283cdfde1e0fff72240f5f475d02
+
+if (( ${#failed[@]} )); then
+    printf '\nFailed steps:\n' >&2
+    printf '  %s\n' "${failed[@]}" >&2
+    exit 1
+fi
