@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Parse the entire installer before running it when piped from curl.
+{
 set -euo pipefail
 
 if [[ $(uname -m) != x86_64 || ! -e /run/ostree-booted || $EUID == 0 ]]; then
@@ -7,7 +9,7 @@ if [[ $(uname -m) != x86_64 || ! -e /run/ostree-booted || $EUID == 0 ]]; then
 fi
 
 echo 'Brother ADS-4100 scanner driver license: https://support.brother.com/g/s/agreement/English_lpr/agree.html'
-read -r -p 'Type yes to accept the license and install the driver: ' answer
+read -r -p 'Type yes to accept the license and install the driver: ' answer </dev/tty
 if [[ $answer != yes ]]; then
     exit 1
 fi
@@ -23,3 +25,4 @@ sudo rpm-ostree install --idempotent --allow-inactive "$driver" sane-backends sa
 
 echo 'Reboot, then plug in and power on the ADS-4100 over USB.'
 echo 'Run scanimage -L as your regular user, then open Skanpage for a test scan.'
+}

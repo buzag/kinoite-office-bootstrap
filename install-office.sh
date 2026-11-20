@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Parse the entire installer before running it when piped from curl.
+{
 set -euo pipefail
 
 if [[ $(uname -m) != x86_64 || ! -e /run/ostree-booted || $EUID == 0 ]]; then
@@ -173,3 +175,4 @@ if (( ${#failed[@]} )); then
     printf '  %s\n' "${failed[@]}" >&2
     exit 1
 fi
+}
